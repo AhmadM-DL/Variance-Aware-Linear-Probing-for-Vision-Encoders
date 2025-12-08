@@ -34,7 +34,7 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
     return classifier, optimizer, epoch, history, variance_tracker
 
 def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
-          encoder_target_dim=768, num_workers=4, learning_rate=1e-3,
+          encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_alpha = 10,
           random_state=42, chkpt_path="./chkpt",
           verbose=True):
     
@@ -70,7 +70,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
 
     if verbose: print("Setting up online varience weighting ...")
     if boost_gradients_with_variance:
-        variance_tracker = WelfordOnlineVariance(encoder_target_dim, device= encoder.device)
+        variance_tracker = WelfordOnlineVariance(encoder_target_dim, device= encoder.device, alpha= variance_alpha)
     else:
         variance_tracker = None
 
