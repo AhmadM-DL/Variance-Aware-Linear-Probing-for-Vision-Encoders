@@ -125,7 +125,7 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
                 var = variance_tracker.variance()
                 if log_variance:
                     vars.append(var)
-                    json.dump(vars, open("./var_logs.json"))
+                    json.dump(vars, open("./var_logs.json", "w"))
                 features = features * (var/var.sum())
             outputs = classifier(features)
             loss = criterion(outputs, labels)
