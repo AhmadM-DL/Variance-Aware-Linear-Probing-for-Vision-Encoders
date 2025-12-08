@@ -2,7 +2,7 @@ import torch, os
 from torch.functional import F
 from enum import Enum, auto
 
-log_variance = os.environ.get('LOG_VARIANCE', False)
+log_variance = bool(os.environ.get('LOG_VARIANCE', "False"))
 
 class VarianceWeightingStrategy(Enum):
     FEATURE_MULTIPLY = auto()
