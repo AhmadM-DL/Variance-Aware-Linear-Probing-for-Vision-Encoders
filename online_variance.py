@@ -59,6 +59,7 @@ def _test_apply_weights():
     num_features = 10
     batch_size = 50
     data = torch.randn(num_samples, num_features) * 2 + 3
+    data = data.to("cuda")
     tracker = WelfordOnlineVariance(num_features=num_features)
     idx = 0
     while idx < num_samples:
