@@ -44,7 +44,7 @@ class WelfordOnlineVariance:
         if self.n < self.active_threshold:
             return torch.ones_like(self.mean)
         var = self.variance() 
-        weights = F.softmax(var, dim=0)
+        weights = var / var.sum()
         return weights
     
     def apply_weights(self, vector):
