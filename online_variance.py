@@ -36,8 +36,6 @@ class WelfordOnlineVariance:
         self.M2 += batch_var * batch_size + delta**2 * (batch_size * (self.n - batch_size) / self.n)
 
     def variance(self):
-        if self.n <= self.active_threshold:
-            return torch.zeros_like(self.mean)
         return self.M2 / (self.n - 1)  
     
 def _test_welford_online_variance():
