@@ -79,6 +79,7 @@ def _test_welford_online_variance():
     num_features = 768
     batch_size = 137 
     data = torch.randn(num_samples, num_features) * 2 + 3
+    data = data.to("cuda")
     tracker = WelfordOnlineVariance(num_features=num_features)
     idx = 0
     while idx < num_samples:
