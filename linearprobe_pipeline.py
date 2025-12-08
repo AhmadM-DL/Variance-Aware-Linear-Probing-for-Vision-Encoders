@@ -1,12 +1,11 @@
 from encoders import get_encoder, get_features
 from datasets import get_dataset
-from online_variance import VarianceWeightingStrategy, WelfordOnlineVariance
+from online_variance import WelfordOnlineVariance
 from torch.utils.data.dataloader import DataLoader
 import torch , os, json
 from time import time
 from tqdm.notebook import tqdm
 import numpy as np
-
 
 def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, variance_tracker= None, weights_only=False):
     checkpoint = {
@@ -148,9 +147,6 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             
             with torch.no_grad():
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
-                if variance_weighting_strategy == VarianceWeightingStrategy.FEATURE_MULTIPLY:
-                    var = variance_tracker.variance()
-                    features = features * (var/var.sum())
                 outputs = classifier(features)
 
             loss = criterion(outputs, labels)
@@ -184,9 +180,6 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 
                 with torch.no_grad():
                     features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
-                    if variance_weighting_strategy == VarianceWeightingStrategy.FEATURE_MULTIPLY:
-                        var = variance_tracker.variance()
-                        features = features * (var/var.sum())
                     outputs = classifier(features)
 
                 loss = criterion(outputs, labels)
