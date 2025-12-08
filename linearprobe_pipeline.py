@@ -7,7 +7,6 @@ from time import time
 from tqdm.notebook import tqdm
 import numpy as np
 
-log_variance = bool(os.environ.get("LOG_VARIANCE", "False"))
 
 def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, variance_tracker= None, weights_only=False):
     checkpoint = {
@@ -18,7 +17,7 @@ def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, va
         'hyperparams': hyperparams,
     }
     if variance_tracker:
-        checkpoint['variance_tracker'] = {'n': variance_tracker.n, 'mean': variance_tracker.mean, 'M2': variance_tracker.M2, 'strategy': variance_tracker.strategy.name}
+        checkpoint['variance_tracker'] = {'n': variance_tracker.n, 'mean': variance_tracker.mean, 'M2': variance_tracker.M2}
     torch.save(checkpoint, path)
 
 def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
@@ -30,12 +29,11 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
         variance_tracker.n = vt_state['n']
         variance_tracker.mean = vt_state['mean']
         variance_tracker.M2 = vt_state['M2']
-        variance_tracker.strategy = VarianceWeightingStrategy[vt_state['strategy']]
     epoch = checkpoint['epoch']
     history = checkpoint['history']
     return classifier, optimizer, epoch, history, variance_tracker
 
-def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_size= 64, n_epochs= 20,
+def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3,
           random_state=42, chkpt_path="./chkpt",
           verbose=True):
@@ -71,10 +69,8 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
     val_dataloader = DataLoader(val_dataset, batch_size, shuffle= False, num_workers= num_workers)
 
     if verbose: print("Setting up online varience weighting ...")
-    if variance_weighting_strategy:
-        variance_tracker = WelfordOnlineVariance(encoder_target_dim, variance_weighting_strategy, device= encoder.device)
-        if log_variance:
-            vars= []
+    if boost_gradients_with_variance:
+        variance_tracker = WelfordOnlineVariance(encoder_target_dim, device= encoder.device)
     else:
         variance_tracker = None
 
@@ -91,8 +87,8 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
     if verbose: print("Loading checkpoint ...")
     escaped_encoder_name = encoder_name.replace("/", "_")
     escaped_dataset_name = dataset_name.replace("/", "_")
-    strategy_name = variance_weighting_strategy.name if variance_weighting_strategy else "vanilla"
-    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{strategy_name}.pt"
+    boosted = "boosted" if boost_gradients_with_variance else "vanilla"
+    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{boosted}.pt"
     chkpt_filepath = os.path.join(chkpt_path, chkpt_filename)
     if os.path.exists(chkpt_filepath):
         classifier, optimizer, start_epoch, history, variance_tracker = load_checkpoint(chkpt_filepath, classifier, optimizer, variance_tracker) 
@@ -102,10 +98,11 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
 
     # Define criterion
     if verbose: print("Defining criterion ...")
+    reduction = "none" if boost_gradients_with_variance else "mean"
     if train_dataset.is_multilabel():
-        criterion = torch.nn.BCEWithLogitsLoss()
+        criterion = torch.nn.BCEWithLogitsLoss(reduction = reduction)
     else:
-        criterion = torch.nn.CrossEntropyLoss()
+        criterion = torch.nn.CrossEntropyLoss(reduction = reduction)
 
     if verbose: print("Starting training ...")
     for epoch in range(start_epoch, n_epochs):
@@ -119,18 +116,16 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
             labels = labels.to(encoder.device)
             with torch.no_grad():
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
-            if variance_weighting_strategy:
+            if boost_gradients_with_variance:
                 variance_tracker.update(features)
-            if variance_weighting_strategy == VarianceWeightingStrategy.FEATURE_MULTIPLY:
-                var = variance_tracker.variance()
-                if log_variance:
-                    vars.append(var.tolist())
-                    json.dump(vars, open("./var_logs.json", "w"))
-                features = features * (var/(var.sum()))
             outputs = classifier(features)
-            loss = criterion(outputs, labels)
-            if variance_weighting_strategy == VarianceWeightingStrategy.LOSS_MULTIPLY:
-                pass
+            loss_vector = criterion(outputs, labels)
+            if boost_gradients_with_variance:
+                var_weights = variance_tracker.variance_weights().view(1, -1)
+                weighted_loss =  loss_vector*var_weights
+                loss = weighted_loss.mean()
+            else:
+                loss = loss_vector
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

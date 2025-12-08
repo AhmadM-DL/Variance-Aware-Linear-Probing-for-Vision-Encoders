@@ -1,17 +1,11 @@
 import torch, os
 from torch.functional import F
-from enum import Enum, auto
-
-class VarianceWeightingStrategy(Enum):
-    FEATURE_MULTIPLY = auto()
-    LOSS_MULTIPLY = auto()
 
 class WelfordOnlineVariance:
-    def __init__(self, num_features, strategy, active_threshold=200, device='cuda'):
+    def __init__(self, num_features, active_threshold=200, device='cuda'):
         self.n = 0
         self.mean = torch.zeros(num_features, device=device)
         self.M2 = torch.zeros(num_features, device=device)
-        self.strategy = strategy
         self.active_threshold = active_threshold
 
     @torch.no_grad()
@@ -37,6 +31,13 @@ class WelfordOnlineVariance:
 
     def variance(self):
         return self.M2 / (self.n - 1)  
+    
+    def variance_weights(self):
+        if self.n < self.active_threshold:
+            return torch.ones_like(self.mean)
+        else:
+            var = self.variance()
+            return var / var.sum()
     
 def _test_welford_online_variance():
     torch.manual_seed(42)
