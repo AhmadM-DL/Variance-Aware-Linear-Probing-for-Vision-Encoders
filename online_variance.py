@@ -2,11 +2,12 @@ import torch, os
 from torch.functional import F
 
 class WelfordOnlineVariance:
-    def __init__(self, num_features, active_threshold=200, device='cuda'):
+    def __init__(self, num_features, active_threshold=200, alpha=5, device='cuda'):
         self.n = 0
         self.mean = torch.zeros(num_features, device=device)
         self.M2 = torch.zeros(num_features, device=device)
         self.active_threshold = active_threshold
+        self.alpha = alpha
 
     @torch.no_grad()
     def update(self, x):
@@ -37,7 +38,7 @@ class WelfordOnlineVariance:
             return torch.ones_like(self.mean)
         else:
             var = self.variance()
-            return (var - var.min()) / (var.max() - var.min() + 1e-8)
+            return (var - var.min()) / (var.max() - var.min() + 1e-8) * alpha
     
 def _test_welford_online_variance():
     torch.manual_seed(42)
