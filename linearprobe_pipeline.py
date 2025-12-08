@@ -88,7 +88,8 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
     escaped_encoder_name = encoder_name.replace("/", "_")
     escaped_dataset_name = dataset_name.replace("/", "_")
     boosted = "boosted" if boost_gradients_with_variance else "vanilla"
-    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{boosted}.pt"
+    alpha_name = variance_alpha if boost_gradients_with_variance else "x"
+    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{boosted}_{alpha_name}.pt"
     chkpt_filepath = os.path.join(chkpt_path, chkpt_filename)
     if os.path.exists(chkpt_filepath):
         classifier, optimizer, start_epoch, history, variance_tracker = load_checkpoint(chkpt_filepath, classifier, optimizer, variance_tracker) 
@@ -146,6 +147,12 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             
             with torch.no_grad():
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
+            
+            if boost_gradients_with_variance:
+                var_weights = variance_tracker.variance_weights().view(1, -1)
+                weighted_weights = classifier.weight * var_weights
+                outputs = F.linear(features, weighted_weights, classifier.bias)
+            else:
                 outputs = classifier(features)
 
             loss = criterion(outputs, labels)
@@ -179,6 +186,13 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 
                 with torch.no_grad():
                     features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
+                
+                if boost_gradients_with_variance:
+                    var_weights = variance_tracker.variance_weights().view(1, -1)
+                    _log_vars(variance_tracker.variance())
+                    weighted_weights = classifier.weight * var_weights
+                    outputs = F.linear(features, weighted_weights, classifier.bias)
+                else:
                     outputs = classifier(features)
 
                 loss = criterion(outputs, labels)
