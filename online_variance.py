@@ -38,7 +38,7 @@ class WelfordOnlineVariance:
             return torch.ones_like(self.mean)
         else:
             var = self.variance()
-            return (var - var.min()) / (var.max() - var.min() + 1e-8) * alpha
+            return (var - var.min()) / (var.max() - var.min() + 1e-8) * self.alpha
     
 def _test_welford_online_variance():
     torch.manual_seed(42)
