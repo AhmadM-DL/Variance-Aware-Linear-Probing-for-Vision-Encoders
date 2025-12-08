@@ -1,0 +1,149 @@
+{
+    "datasets": [
+        {
+            "id": "aircraft",
+            "task": "classification",
+            "active": true
+        },
+        {
+            "id": "flowers102",
+            "task": "classification",
+            "active": true
+        },
+        {
+            "id": "cub2011",
+            "task": "classification",
+            "active": false
+        },
+        {
+            "id": "retinamnist",
+            "task": "classification",
+            "active": true
+        },
+        {
+            "id": "chestmnist",
+            "task": "multilabel_classification",
+            "active": false
+        },
+        {
+            "id": "tissuemnist",
+            "task": "classification",
+            "active": false
+        },
+        {
+            "id": "eurosat",
+            "task": "classification",
+            "active": false
+        },
+        {
+            "id": "dtd",
+            "task": "classification",
+            "active": true
+        },
+        {
+            "id": "svhn",
+            "task": "classification",
+            "active": true
+        }
+    ],
+    "encoders": [
+        {
+            "id": "microsoft/resnet-50",
+            "type": "CNN",
+            "input_size": 224,
+            "params": "25.6M",
+            "active": true
+        },
+        {
+            "id": "google/efficientnet-b0",
+            "type": "CNN",
+            "input_size": 224,
+            "params": "5.3M",
+            "active": true
+        },
+        {
+            "id": "facebook/convnext-base-224",
+            "type": "CNN",
+            "input_size": 224,
+            "params": "89M",
+            "active": true
+        },
+        {
+            "id": "google/vit-base-patch16-224-in21k",
+            "type": "Transformer",
+            "input_size": 224,
+            "params": "86.4M",
+            "active": true
+        },
+        {
+            "id": "facebook/deit-base-distilled-patch16-224",
+            "type": "Transformer",
+            "input_size": 224,
+            "params": "86M",
+            "active": false
+        },
+        {
+            "id": "microsoft/swin-base-patch4-window7-224",
+            "type": "Transformer",
+            "input_size": 224,
+            "params": "87.8M",
+            "active": true
+        },
+        {
+            "id": "custom/moco-v3-vit-b",
+            "type": "SSL",
+            "input_size": 224,
+            "params": "86.6M",
+            "active": false
+        },
+        {
+            "id": "custom/byol-resnet50",
+            "type": "SSL",
+            "input_size": 224,
+            "params": "25.6M",
+            "active": false
+        },
+        {
+            "id": "facebook/vit-mae-base",
+            "type": "SSL",
+            "input_size": 224,
+            "params": "112M",
+            "active": false
+        },
+        {
+            "id": "facebook/dinov2-base",
+            "type": "SSL",
+            "input_size": 224,
+            "params": "86.6M",
+            "active": true
+        },
+        {
+            "id": "custom/simclr-resnet-50",
+            "type": "SSL",
+            "input_size": 224,
+            "params": "24M",
+            "active": false
+        },
+        {
+            "id": "openai/clip-vit-base-patch32",
+            "type": "Foundation",
+            "input_size": 224,
+            "params": "88M",
+            "active": true
+        },
+        {
+            "id": "Intel/dpt-swinv2-base-384",
+            "type": "Specialized",
+            "input_size": 384,
+            "params": "101M",
+            "active": false
+        },
+        {
+            "id": "custom/eva02_base_patch14_224.mim_in22k",
+            "type": "SSL",
+            "input_size": 224,
+            "params": "85.8",
+            "active": true
+        }
+    ]
+}
