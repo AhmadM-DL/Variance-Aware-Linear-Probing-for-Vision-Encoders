@@ -3,8 +3,8 @@ from torch.functional import F
 from enum import Enum, auto
 
 class VarianceWeightingStrategy(Enum):
-    FEATURE_MULTIPLY = "feature_multiply"
-    LOSS_MULTIPLY = "loss_multiply"
+    FEATURE_MULTIPLY = auto()
+    LOSS_MULTIPLY = auto()
 
 class WelfordOnlineVariance:
     def __init__(self, num_features, strategy, device='cuda'):

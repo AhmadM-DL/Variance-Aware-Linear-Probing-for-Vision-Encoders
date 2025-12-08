@@ -16,7 +16,7 @@ def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, va
         'hyperparams': hyperparams,
     }
     if variance_tracker:
-        checkpoint['variance_tracker'] = {'n': variance_tracker.n, 'mean': variance_tracker.mean, 'M2': variance_tracker.M2, 'strategy': variance_tracker.strategy}
+        checkpoint['variance_tracker'] = {'n': variance_tracker.n, 'mean': variance_tracker.mean, 'M2': variance_tracker.M2, 'strategy': variance_tracker.strategy.name}
     torch.save(checkpoint, path)
 
 def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
@@ -28,7 +28,7 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
         variance_tracker.n = vt_state['n']
         variance_tracker.mean = vt_state['mean']
         variance_tracker.M2 = vt_state['M2']
-        variance_tracker.strategy = vt_state['strategy']
+        variance_tracker.strategy = VarianceWeightingStrategy[vt_state['strategy']]
     epoch = checkpoint['epoch']
     history = checkpoint['history']
     return classifier, optimizer, epoch, history, variance_tracker
