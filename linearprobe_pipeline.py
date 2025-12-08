@@ -117,9 +117,8 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
             if variance_weighting_strategy:
                 variance_tracker.update(features)
-                features = features.detach().requires_grad_(True)
             if variance_weighting_strategy == VarianceWeightingStrategy.FEATURE_MULTIPLY:
-                features = variance_tracker.apply_weights(features)
+                features = (features * variance_tracker.variance_weights().to(features.device)).clone().requires_grad_(True)
             outputs = classifier(features)
             loss = criterion(outputs, labels)
             if variance_weighting_strategy == VarianceWeightingStrategy.LOSS_MULTIPLY:
