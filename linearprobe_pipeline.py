@@ -2,8 +2,8 @@ from encoders import get_encoder, get_features
 from datasets import get_dataset
 from online_variance import WelfordOnlineVariance
 from torch.utils.data.dataloader import DataLoader
-import torch , os, json
-from time import time
+import torch , os
+from torch.functional import F
 from tqdm.notebook import tqdm
 import numpy as np
 
@@ -97,11 +97,10 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
 
     # Define criterion
     if verbose: print("Defining criterion ...")
-    reduction = "none" if boost_gradients_with_variance else "mean"
     if train_dataset.is_multilabel():
-        criterion = torch.nn.BCEWithLogitsLoss(reduction = reduction)
+        criterion = torch.nn.BCEWithLogitsLoss()
     else:
-        criterion = torch.nn.CrossEntropyLoss(reduction = reduction)
+        criterion = torch.nn.CrossEntropyLoss()
 
     if verbose: print("Starting training ...")
     for epoch in range(start_epoch, n_epochs):
@@ -117,14 +116,12 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
             if boost_gradients_with_variance:
                 variance_tracker.update(features)
-            outputs = classifier(features)
-            loss_vector = criterion(outputs, labels)
-            if boost_gradients_with_variance:
                 var_weights = variance_tracker.variance_weights().view(1, -1)
-                weighted_loss =  loss_vector*var_weights
-                loss = weighted_loss.mean()
+                weighted_weights = classifier.weight * var_weights
+                outputs = F.linear(features, weighted_weights, classifier.bias)
             else:
-                loss = loss_vector
+                outputs = classifier(features)
+            loss = criterion(outputs, labels)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
