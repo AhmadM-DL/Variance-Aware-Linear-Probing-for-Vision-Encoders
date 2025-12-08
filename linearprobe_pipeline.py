@@ -1,34 +1,40 @@
 from encoders import get_encoder, get_features
 from datasets import get_dataset
+from online_variance import VarianceWeightingStrategy, WelfordOnlineVariance
 from torch.utils.data.dataloader import DataLoader
-import torch 
-import os
+import torch , os
 from time import time
 from tqdm.notebook import tqdm
 import numpy as np
 
-def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, early_stopped, weights_only=False):
+def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, variance_tracker= None, weights_only=False):
     checkpoint = {
         'classifier_state': classifier.state_dict(),
         'optimizer_state': optimizer.state_dict(),
         'epoch': epoch,
         'history': history,
         'hyperparams': hyperparams,
-        'early_stopped': early_stopped
     }
+    if variance_tracker:
+        checkpoint['variance_tracker'] = {'n': variance_tracker.n, 'mean': variance_tracker.mean, 'M2': variance_tracker.M2}
     torch.save(checkpoint, path)
 
-def load_checkpoint(path, classifier, optimizer):
+def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
     checkpoint = torch.load(path, weights_only=False)
     classifier.load_state_dict(checkpoint['classifier_state'])
     optimizer.load_state_dict(checkpoint['optimizer_state'])
+    if variance_tracker is not None and 'variance_tracker' in checkpoint:
+        vt_state = checkpoint['variance_tracker']
+        variance_tracker.n = vt_state['n']
+        variance_tracker.mean = vt_state['mean']
+        variance_tracker.M2 = vt_state['M2']
     epoch = checkpoint['epoch']
     history = checkpoint['history']
-    return classifier, optimizer, epoch, history
+    return classifier, optimizer, epoch, history, variance_tracker
 
-def probe(encoder_name, dataset_name, batch_size= 64, n_epochs= 20,
+def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_size= 64, n_epochs= 20,
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3,
-          early_stopping=True, random_state=42, chkpt_path="./chkpt",
+          random_state=42, chkpt_path="./chkpt",
           verbose=True):
     
     # Set random seed for reproducibility
@@ -61,6 +67,12 @@ def probe(encoder_name, dataset_name, batch_size= 64, n_epochs= 20,
     test_dataloader = DataLoader(test_dataset, batch_size, shuffle= False, num_workers= num_workers)
     val_dataloader = DataLoader(val_dataset, batch_size, shuffle= False, num_workers= num_workers)
 
+    if verbose: print("Setting up online varience weighting ...")
+    if variance_weighting_strategy:
+        variance_tracker = WelfordOnlineVariance(encoder_target_dim, encoder.device)
+    else:
+        variance_tracker = None
+
     # Define classifier
     if verbose: print("Defining classifier ...")
     classifier = torch.nn.Linear(encoder_target_dim, train_dataset.num_labels())
@@ -77,7 +89,7 @@ def probe(encoder_name, dataset_name, batch_size= 64, n_epochs= 20,
     chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}.pt"
     chkpt_filepath = os.path.join(chkpt_path, chkpt_filename)
     if os.path.exists(chkpt_filepath):
-        classifier, optimizer, start_epoch, history = load_checkpoint(chkpt_filepath, classifier, optimizer) 
+        classifier, optimizer, start_epoch, history, variance_tracker = load_checkpoint(chkpt_filepath, classifier, optimizer, variance_tracker) 
     else:
         start_epoch = 0
         history = []
@@ -101,8 +113,14 @@ def probe(encoder_name, dataset_name, batch_size= 64, n_epochs= 20,
             labels = labels.to(encoder.device)
             with torch.no_grad():
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
+            if variance_weighting_strategy:
+                variance_tracker.update(features)
+            if variance_weighting_strategy == VarianceWeightingStrategy.FEATURE_MULTIPLY:
+                features = variance_tracker.apply_weights(features)
             outputs = classifier(features)
             loss = criterion(outputs, labels)
+            if variance_weighting_strategy == VarianceWeightingStrategy.LOSS_MULTIPLY:
+                loss = variance_tracker.apply_weights(loss)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -125,6 +143,8 @@ def probe(encoder_name, dataset_name, batch_size= 64, n_epochs= 20,
             
             with torch.no_grad():
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
+                if variance_weighting_strategy == VarianceWeightingStrategy.FEATURE_MULTIPLY:
+                    features = variance_tracker.apply_weights(features)
                 outputs = classifier(features)
 
             loss = criterion(outputs, labels)
@@ -144,25 +164,6 @@ def probe(encoder_name, dataset_name, batch_size= 64, n_epochs= 20,
         val_acc = 100.0 * (np.array(val_preds) == np.array(val_labels)).sum() / len(val_labels)
         tqdm.write(f"Epoch {epoch+1}/{n_epochs}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.2f}%")
 
-        # Early stopping
-        if early_stopping:
-            recent_accs = [val_record["val_accuracy"] for val_record in history[-5:]]
-            recent_accs.append(val_acc)
-            # If no improvement in last 6 epochs, stop training
-            # 6 epochs to have at least one test iteration
-            if (len(recent_accs) >= 6) and (max(recent_accs) - min(recent_accs) < 0.05):
-                print("Early stopping triggered. No improvement in validation accuracy.")
-                history.append({
-                    "epoch": epoch + 1, 
-                    "train_loss": train_loss,
-                    "val_loss": val_loss,
-                    "val_accuracy": val_acc,
-                    "test_loss": None,
-                    "test_accuracy": None
-                })
-                save_checkpoint(chkpt_filepath, classifier, optimizer, epoch + 1, history, hyperparams, early_stopped=True)
-                break
-
         # Testing loop
         if (epoch+1) % 5 == 0:
             classifier.eval()
@@ -177,6 +178,8 @@ def probe(encoder_name, dataset_name, batch_size= 64, n_epochs= 20,
                 
                 with torch.no_grad():
                     features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
+                    if variance_weighting_strategy == VarianceWeightingStrategy.FEATURE_MULTIPLY:
+                        features = variance_tracker.apply_weights(features)
                     outputs = classifier(features)
 
                 loss = criterion(outputs, labels)
@@ -209,4 +212,4 @@ def probe(encoder_name, dataset_name, batch_size= 64, n_epochs= 20,
             "test_accuracy": test_acc
         })
 
-        save_checkpoint(chkpt_filepath, classifier, optimizer, epoch + 1, history, hyperparams, early_stopped=False)
+        save_checkpoint(chkpt_filepath, classifier, optimizer, epoch + 1, history, hyperparams, variance_tracker)
