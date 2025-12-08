@@ -43,7 +43,7 @@ class WelfordOnlineVariance:
         var = self.variance() 
         # In early batches variance is more uniform and become less uniform with training steps
         alpha = min(1.0, self.n / 100.0)
-        adjusted_weights = alpha * var + (1 - alpha) * torch.ones_like(var) 
+        adjusted_weights = alpha * var #+ (1 - alpha) * torch.ones_like(var) 
         weights = F.softmax(adjusted_weights, dim=0)
         return weights
     
