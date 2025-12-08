@@ -1,6 +1,8 @@
-import torch
+import torch, os
 from torch.functional import F
 from enum import Enum, auto
+
+log_variance = os.environ.get('LOG_VARIANCE', False)
 
 class VarianceWeightingStrategy(Enum):
     FEATURE_MULTIPLY = auto()
@@ -36,9 +38,15 @@ class WelfordOnlineVariance:
         self.M2 += batch_var * batch_size + delta**2 * (batch_size * (self.n - batch_size) / self.n)
 
     def variance(self):
+        variance_output = None
         if self.n < 2:
-            return torch.zeros_like(self.mean)
-        return self.M2 / (self.n - 1)
+            variance_output = torch.zeros_like(self.mean)
+        variance_output = self.M2 / (self.n - 1)
+        if log_variance:
+            with open("./variance_logs", "w") as f:
+                f.write(variance_output)
+                f.write("\n")
+        return variance_output
     
     def variance_weights(self):
         if self.n < self.active_threshold:
