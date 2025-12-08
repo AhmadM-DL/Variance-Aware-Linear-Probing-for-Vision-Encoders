@@ -87,7 +87,8 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
     if verbose: print("Loading checkpoint ...")
     escaped_encoder_name = encoder_name.replace("/", "_")
     escaped_dataset_name = dataset_name.replace("/", "_")
-    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}.pt"
+    strategy_name = variance_weighting_strategy.name if variance_weighting_strategy else "vanilla"
+    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{strategy_name}.pt"
     chkpt_filepath = os.path.join(chkpt_path, chkpt_filename)
     if os.path.exists(chkpt_filepath):
         classifier, optimizer, start_epoch, history, variance_tracker = load_checkpoint(chkpt_filepath, classifier, optimizer, variance_tracker) 
