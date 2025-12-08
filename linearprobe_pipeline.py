@@ -6,6 +6,7 @@ import torch , os
 from torch.functional import F
 from tqdm.notebook import tqdm
 import numpy as np
+import json
 
 def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, variance_tracker= None, weights_only=False):
     checkpoint = {
@@ -117,6 +118,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             if boost_gradients_with_variance:
                 variance_tracker.update(features)
                 var_weights = variance_tracker.variance_weights().view(1, -1)
+                _log_vars(variance_tracker.variance())
                 weighted_weights = classifier.weight * var_weights
                 outputs = F.linear(features, weighted_weights, classifier.bias)
             else:
@@ -210,3 +212,17 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
         })
 
         save_checkpoint(chkpt_filepath, classifier, optimizer, epoch + 1, history, hyperparams, variance_tracker)
+
+def _log_vars(var):
+    log_vars = bool(os.environ.get("LOG_VARIANCE", "False"))
+    if log_vars:
+        path = "./var_logs.json"
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                prev_vars = json.load(f)
+        else:
+            prev_vars = []
+        prev_vars.append(var)
+        with open(path, "w") as f:
+            json.dump(prev_vars, f)
+    
