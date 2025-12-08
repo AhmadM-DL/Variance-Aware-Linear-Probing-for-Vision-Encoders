@@ -214,6 +214,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
         save_checkpoint(chkpt_filepath, classifier, optimizer, epoch + 1, history, hyperparams, variance_tracker)
 
 def _log_vars(var):
+    var = var.tolist()
     log_vars = bool(os.environ.get("LOG_VARIANCE", "False"))
     if log_vars:
         path = "./var_logs.json"
