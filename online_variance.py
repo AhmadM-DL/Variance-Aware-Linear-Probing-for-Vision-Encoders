@@ -44,7 +44,7 @@ class WelfordOnlineVariance:
         variance_output = self.M2 / (self.n - 1)
         if log_variance:
             with open("./variance_logs", "w") as f:
-                f.write(variance_output)
+                f.write(str(variance_output))
                 f.write("\n")
         return variance_output
     
