@@ -36,44 +36,9 @@ class WelfordOnlineVariance:
         self.M2 += batch_var * batch_size + delta**2 * (batch_size * (self.n - batch_size) / self.n)
 
     def variance(self):
-        if self.n <= 1:
+        if self.n <= self.active_threshold:
             return torch.zeros_like(self.mean)
-        return self.M2 / (self.n - 1)
-    
-    def variance_weights(self):
-        if self.n < self.active_threshold:
-            return torch.ones_like(self.mean)
-        var = self.variance() 
-        weights = var / var.sum()
-        return weights
-    
-    def apply_weights(self, vector):
-        weights = self.variance_weights()
-        return vector * weights
-
-    def std(self):
-        return torch.sqrt(self.variance())    
-
-def _test_apply_weights():
-    torch.manual_seed(123)
-    num_samples = 500
-    num_features = 10
-    batch_size = 50
-    data = torch.randn(num_samples, num_features) * 2 + 3
-    data = data.to("cuda")
-    tracker = WelfordOnlineVariance(num_features=num_features)
-    idx = 0
-    while idx < num_samples:
-        batch = data[idx:idx+batch_size]
-        tracker.update(batch)
-        weighted_batch = tracker.apply_weights(batch)
-        assert weighted_batch.shape == batch.shape, "Weighted batch has wrong shape"
-        assert not torch.isnan(weighted_batch).any(), "NaNs in weighted batch"
-        if tracker.n < 20:
-            weights = tracker.variance_weights()
-            max_diff = (weights - 1/num_features).abs().max().item()
-            assert max_diff < 0.2, f"Weights too peaky early: max diff {max_diff}"
-        idx += batch_size
+        return self.M2 / (self.n - 1)  
     
 def _test_welford_online_variance():
     torch.manual_seed(42)

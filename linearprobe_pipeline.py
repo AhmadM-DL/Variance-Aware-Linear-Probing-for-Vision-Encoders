@@ -2,10 +2,12 @@ from encoders import get_encoder, get_features
 from datasets import get_dataset
 from online_variance import VarianceWeightingStrategy, WelfordOnlineVariance
 from torch.utils.data.dataloader import DataLoader
-import torch , os
+import torch , os, json
 from time import time
 from tqdm.notebook import tqdm
 import numpy as np
+
+log_variance = bool(os.environ.get("LOG_VARIANCE", "False"))
 
 def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, variance_tracker= None, weights_only=False):
     checkpoint = {
@@ -71,6 +73,8 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
     if verbose: print("Setting up online varience weighting ...")
     if variance_weighting_strategy:
         variance_tracker = WelfordOnlineVariance(encoder_target_dim, variance_weighting_strategy, device= encoder.device)
+        if log_variance:
+            vars= []
     else:
         variance_tracker = None
 
@@ -118,7 +122,11 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
             if variance_weighting_strategy:
                 variance_tracker.update(features)
             if variance_weighting_strategy == VarianceWeightingStrategy.FEATURE_MULTIPLY:
-                features = (features * variance_tracker.variance_weights().to(features.device)).clone().requires_grad_(True)
+                var = variance_tracker.variance()
+                if log_variance:
+                    vars.append(var)
+                    json.dump(vars, open("./var_logs.json"))
+                features = features * (var/var.sum())
             outputs = classifier(features)
             loss = criterion(outputs, labels)
             if variance_weighting_strategy == VarianceWeightingStrategy.LOSS_MULTIPLY:
