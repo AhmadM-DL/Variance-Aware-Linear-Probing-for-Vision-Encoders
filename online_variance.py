@@ -7,11 +7,12 @@ class VarianceWeightingStrategy(Enum):
     LOSS_MULTIPLY = auto()
 
 class WelfordOnlineVariance:
-    def __init__(self, num_features, strategy, device='cuda'):
+    def __init__(self, num_features, strategy, active_threshold=200, device='cuda'):
         self.n = 0
         self.mean = torch.zeros(num_features, device=device)
         self.M2 = torch.zeros(num_features, device=device)
         self.strategy = strategy
+        self.active_threshold = active_threshold
 
     @torch.no_grad()
     def update(self, x):
@@ -40,11 +41,10 @@ class WelfordOnlineVariance:
         return self.M2 / (self.n - 1)
     
     def variance_weights(self):
+        if self.n < self.active_threshold:
+            return torch.ones_like(self.mean)
         var = self.variance() 
-        # In early batches variance is more uniform and become less uniform with training steps
-        alpha = min(1.0, self.n / 100.0)
-        adjusted_weights = alpha * var #+ (1 - alpha) * torch.ones_like(var) 
-        weights = F.softmax(adjusted_weights, dim=0)
+        weights = F.softmax(var, dim=0)
         return weights
     
     def apply_weights(self, vector):
