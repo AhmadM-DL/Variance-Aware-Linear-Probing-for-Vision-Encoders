@@ -70,7 +70,7 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
 
     if verbose: print("Setting up online varience weighting ...")
     if variance_weighting_strategy:
-        variance_tracker = WelfordOnlineVariance(encoder_target_dim, variance_weighting_strategy, encoder.device)
+        variance_tracker = WelfordOnlineVariance(encoder_target_dim, variance_weighting_strategy, device= encoder.device)
     else:
         variance_tracker = None
 
