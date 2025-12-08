@@ -3,14 +3,15 @@ from torch.functional import F
 from enum import Enum, auto
 
 class VarianceWeightingStrategy(Enum):
-    FEATURE_MULTIPLY = auto()
-    LOSS_MULTIPLY = auto()
+    FEATURE_MULTIPLY = "feature_multiply"
+    LOSS_MULTIPLY = "loss_multiply"
 
 class WelfordOnlineVariance:
-    def __init__(self, num_features, device='cuda'):
+    def __init__(self, num_features, strategy, device='cuda'):
         self.n = 0
         self.mean = torch.zeros(num_features, device=device)
         self.M2 = torch.zeros(num_features, device=device)
+        self.strategy = strategy
 
     @torch.no_grad()
     def update(self, x):

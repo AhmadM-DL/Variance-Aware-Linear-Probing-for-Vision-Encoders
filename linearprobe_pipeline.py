@@ -16,7 +16,7 @@ def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, va
         'hyperparams': hyperparams,
     }
     if variance_tracker:
-        checkpoint['variance_tracker'] = {'n': variance_tracker.n, 'mean': variance_tracker.mean, 'M2': variance_tracker.M2}
+        checkpoint['variance_tracker'] = {'n': variance_tracker.n, 'mean': variance_tracker.mean, 'M2': variance_tracker.M2, 'strategy': variance_tracker.strategy}
     torch.save(checkpoint, path)
 
 def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
@@ -28,6 +28,7 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
         variance_tracker.n = vt_state['n']
         variance_tracker.mean = vt_state['mean']
         variance_tracker.M2 = vt_state['M2']
+        variance_tracker.strategy = vt_state['strategy']
     epoch = checkpoint['epoch']
     history = checkpoint['history']
     return classifier, optimizer, epoch, history, variance_tracker
@@ -69,7 +70,7 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
 
     if verbose: print("Setting up online varience weighting ...")
     if variance_weighting_strategy:
-        variance_tracker = WelfordOnlineVariance(encoder_target_dim, encoder.device)
+        variance_tracker = WelfordOnlineVariance(encoder_target_dim, variance_weighting_strategy, encoder.device)
     else:
         variance_tracker = None
 
