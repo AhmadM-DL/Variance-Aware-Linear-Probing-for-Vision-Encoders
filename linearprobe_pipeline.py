@@ -124,7 +124,7 @@ def probe(encoder_name, dataset_name, variance_weighting_strategy= None, batch_s
             if variance_weighting_strategy == VarianceWeightingStrategy.FEATURE_MULTIPLY:
                 var = variance_tracker.variance()
                 if log_variance:
-                    vars.append(var)
+                    vars.append(var.tolist())
                     json.dump(vars, open("./var_logs.json", "w"))
                 features = features * (var/var.sum())
             outputs = classifier(features)
