@@ -148,11 +148,11 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             with torch.no_grad():
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
             
-            if boost_gradients_with_variance:
-                var_weights = variance_tracker.variance_weights().view(1, -1)
-                weighted_weights = classifier.weight * var_weights
-                outputs = F.linear(features, weighted_weights, classifier.bias)
-            else:
+            # if boost_gradients_with_variance:
+            #     var_weights = variance_tracker.variance_weights().view(1, -1)
+            #     weighted_weights = classifier.weight * var_weights
+            #     outputs = F.linear(features, weighted_weights, classifier.bias)
+            # else:
                 outputs = classifier(features)
 
             loss = criterion(outputs, labels)
@@ -187,12 +187,12 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 with torch.no_grad():
                     features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
                 
-                if boost_gradients_with_variance:
-                    var_weights = variance_tracker.variance_weights().view(1, -1)
-                    _log_vars(variance_tracker.variance())
-                    weighted_weights = classifier.weight * var_weights
-                    outputs = F.linear(features, weighted_weights, classifier.bias)
-                else:
+                # if boost_gradients_with_variance:
+                #     var_weights = variance_tracker.variance_weights().view(1, -1)
+                #     _log_vars(variance_tracker.variance())
+                #     weighted_weights = classifier.weight * var_weights
+                #     outputs = F.linear(features, weighted_weights, classifier.bias)
+                # else:
                     outputs = classifier(features)
 
                 loss = criterion(outputs, labels)
