@@ -34,7 +34,7 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
     return classifier, optimizer, epoch, history, variance_tracker
 
 def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
-          encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_multiplier = 1e2,
+          encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_multiplier = 30,
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1,
           verbose=True):
     
@@ -120,9 +120,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 variance_tracker.update(features)
                 var_weights = variance_tracker.variance_weights().view(1, -1)
                 _log_vars(variance_tracker.variance())
-                weights_max = classifier.weight.max()
-                multiplier = weights_max*variance_multiplier
-                weighted_weights = classifier.weight * var_weights * multiplier
+                weighted_weights = classifier.weight * var_weights * variance_multiplier
                 outputs = F.linear(features, weighted_weights, classifier.bias)
             else:
                 outputs = classifier(features)
