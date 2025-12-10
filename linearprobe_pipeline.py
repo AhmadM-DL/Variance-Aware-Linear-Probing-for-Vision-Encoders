@@ -35,7 +35,7 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
 
 def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_alpha = 10,
-          random_state=42, chkpt_path="./chkpt",
+          random_state=42, chkpt_path="./chkpt", test_everyx_steps=1,
           verbose=True):
     
     # Set random seed for reproducibility
@@ -173,7 +173,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
         tqdm.write(f"Epoch {epoch+1}/{n_epochs}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.2f}%")
 
         # Testing loop
-        if (epoch+1) % 5 == 0:
+        if (epoch+1) % test_everyx_steps == 0:
             classifier.eval()
             test_losses = []
             test_preds = []
