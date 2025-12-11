@@ -42,7 +42,7 @@ class WeightGradScaler(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         (scale_vec,) = ctx.saved_tensors
-        scaled = grad_output * scale_vec
+        scaled = grad_output * scale_vec * 30
         return scaled, None
 
 def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
