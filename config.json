@@ -3,7 +3,7 @@
         {
             "id": "aircraft",
             "task": "classification",
-            "active": true
+            "active": false
         },
         {
             "id": "flowers102",
@@ -43,7 +43,7 @@
         {
             "id": "svhn",
             "task": "classification",
-            "active": true
+            "active": false
         }
     ],
     "encoders": [
@@ -52,6 +52,7 @@
             "type": "CNN",
             "input_size": 224,
             "params": "25.6M",
+            "output_size": 2048,
             "active": true
         },
         {
@@ -59,6 +60,7 @@
             "type": "CNN",
             "input_size": 224,
             "params": "5.3M",
+            "output_size": 1280,
             "active": true
         },
         {
@@ -66,6 +68,7 @@
             "type": "CNN",
             "input_size": 224,
             "params": "89M",
+            "output_size": 1024,
             "active": true
         },
         {
@@ -73,6 +76,7 @@
             "type": "Transformer",
             "input_size": 224,
             "params": "86.4M",
+            "output_size": 768,
             "active": true
         },
         {
@@ -80,6 +84,7 @@
             "type": "Transformer",
             "input_size": 224,
             "params": "86M",
+            "output_size": 768,
             "active": false
         },
         {
@@ -87,6 +92,7 @@
             "type": "Transformer",
             "input_size": 224,
             "params": "87.8M",
+            "output_size": 1024,
             "active": true
         },
         {
@@ -94,6 +100,7 @@
             "type": "SSL",
             "input_size": 224,
             "params": "86.6M",
+            "output_size": 768,
             "active": false
         },
         {
@@ -101,6 +108,7 @@
             "type": "SSL",
             "input_size": 224,
             "params": "25.6M",
+            "output_size": 2048,
             "active": false
         },
         {
@@ -108,6 +116,7 @@
             "type": "SSL",
             "input_size": 224,
             "params": "112M",
+            "output_size": 768,
             "active": false
         },
         {
@@ -115,6 +124,7 @@
             "type": "SSL",
             "input_size": 224,
             "params": "86.6M",
+            "output_size": 768,
             "active": true
         },
         {
@@ -122,6 +132,7 @@
             "type": "SSL",
             "input_size": 224,
             "params": "24M",
+            "output_size": 2048,
             "active": false
         },
         {
@@ -129,6 +140,7 @@
             "type": "Foundation",
             "input_size": 224,
             "params": "88M",
+            "output_size": 512,
             "active": true
         },
         {
@@ -136,13 +148,15 @@
             "type": "Specialized",
             "input_size": 384,
             "params": "101M",
+            "output_size": 1024,
             "active": false
         },
         {
             "id": "custom/eva02_base_patch14_224.mim_in22k",
             "type": "SSL",
             "input_size": 224,
-            "params": "85.8",
+            "params": "85.8M",
+            "output_size": 768,
             "active": true
         }
     ]
