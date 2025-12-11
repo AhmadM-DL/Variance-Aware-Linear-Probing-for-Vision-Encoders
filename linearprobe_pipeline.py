@@ -71,14 +71,17 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
 
     if verbose: print("Setting up online varience weighting ...")
     if boost_gradients_with_variance:
-        variance_tracker = WelfordOnlineVariance(encoder_target_dim, device= encoder.device)
+        variance_tracker = WelfordOnlineVariance(encoder_target_dim, device= device)
     else:
         variance_tracker = None
+
+    # Get device
+    device = next(encoder.parameters()).device
 
     # Define classifier
     if verbose: print("Defining classifier ...")
     classifier = torch.nn.Linear(encoder_target_dim, train_dataset.num_labels())
-    classifier.to(next(encoder.parameters()).device)
+    classifier.to(device)
 
     # Define optimizer
     if verbose: print("Defining optimizer ...")
@@ -112,8 +115,8 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
         pbar = tqdm(train_dataloader, desc=f'Epoch {epoch+1}/{n_epochs}')
         for batch in pbar:
             inputs, labels = batch
-            inputs = inputs.to(encoder.device)
-            labels = labels.to(encoder.device)
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             with torch.no_grad():
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
             if boost_gradients_with_variance:
@@ -142,8 +145,8 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
         pbar = tqdm(val_dataloader, desc=f'Validation Epoch {epoch+1}/{n_epochs}')
         for batch in pbar:
             inputs, labels = batch
-            inputs = inputs.to(encoder.device)
-            labels = labels.to(encoder.device)  
+            inputs = inputs.to(device)
+            labels = labels.to(device)  
             
             with torch.no_grad():
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
@@ -181,8 +184,8 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             pbar = tqdm(test_dataloader, desc=f'Testing Epoch {epoch+1}/{n_epochs}')
             for batch in pbar:
                 inputs, labels = batch
-                inputs = inputs.to(encoder.device)
-                labels = labels.to(encoder.device)
+                inputs = inputs.to(device)
+                labels = labels.to(device)
                 
                 with torch.no_grad():
                     features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
