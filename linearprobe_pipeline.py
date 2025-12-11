@@ -57,6 +57,9 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
     if verbose: print("Loading model ...")
     encoder, processor = get_encoder(encoder_name)
 
+    # Get device
+    device = next(encoder.parameters()).device
+    
     # Get datasets
     if verbose: print("Loading dataset ...")
     train_dataset = get_dataset(dataset_name, "train", processor)
@@ -74,9 +77,6 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
         variance_tracker = WelfordOnlineVariance(encoder_target_dim, device= device)
     else:
         variance_tracker = None
-
-    # Get device
-    device = next(encoder.parameters()).device
 
     # Define classifier
     if verbose: print("Defining classifier ...")
