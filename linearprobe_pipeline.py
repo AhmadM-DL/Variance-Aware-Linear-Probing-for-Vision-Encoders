@@ -150,7 +150,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             
             if boost_gradients_with_variance:
                 var_weights = variance_tracker.variance_weights().view(1, -1)
-                weighted_weights = classifier.weight * var_weights
+                weighted_weights = classifier.weight * var_weights * weight_multiplier
                 outputs = F.linear(features, weighted_weights, classifier.bias)
             else:
                 outputs = classifier(features)
@@ -189,7 +189,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 
                 if boost_gradients_with_variance:
                     var_weights = variance_tracker.variance_weights().view(1, -1)
-                    weighted_weights = classifier.weight * var_weights
+                    weighted_weights = classifier.weight * var_weights * weight_multiplier
                     outputs = F.linear(features, weighted_weights, classifier.bias)
                 else:
                     outputs = classifier(features)
