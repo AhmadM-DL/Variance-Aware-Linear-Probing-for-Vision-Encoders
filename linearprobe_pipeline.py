@@ -78,7 +78,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
     # Define classifier
     if verbose: print("Defining classifier ...")
     classifier = torch.nn.Linear(encoder_target_dim, train_dataset.num_labels())
-    classifier.to(encoder.device)
+    classifier.to(next(encoder.parameters()).device)
 
     # Define optimizer
     if verbose: print("Defining optimizer ...")
