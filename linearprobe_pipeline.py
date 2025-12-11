@@ -33,20 +33,9 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
     history = checkpoint['history']
     return classifier, optimizer, epoch, history, variance_tracker
 
-class WeightGradScaler(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, W, scale_vec):
-        ctx.save_for_backward(scale_vec)
-        return W
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (scale_vec,) = ctx.saved_tensors
-        scaled = grad_output * scale_vec * 30
-        return scaled, None
 
 def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
-          encoder_target_dim=768, num_workers=4, learning_rate=1e-3,
+          encoder_target_dim=768, num_workers=4, learning_rate=1e-3, weight_multiplier= 30,
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1,
           verbose=True):
     
@@ -130,8 +119,8 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             if boost_gradients_with_variance:
                 variance_tracker.update(features)
                 var_weights = variance_tracker.variance_weights().view(1, -1)
-                scaled_weights = WeightGradScaler.apply(classifier.weight, var_weights)
-                outputs = features @ scaled_weights.T + classifier.bias
+                weighted_weights = classifier.weight * var_weights * weight_multiplier
+                outputs = F.linear(features, weighted_weights, classifier.bias)
                 _log_vars(variance_tracker.variance())
             else:
                 outputs = classifier(features)
@@ -159,11 +148,11 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             with torch.no_grad():
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
             
-            # if boost_gradients_with_variance:
-            #     var_weights = variance_tracker.variance_weights().view(1, -1)
-            #     weighted_weights = classifier.weight * var_weights
-            #     outputs = F.linear(features, weighted_weights, classifier.bias)
-            # else:
+            if boost_gradients_with_variance:
+                var_weights = variance_tracker.variance_weights().view(1, -1)
+                weighted_weights = classifier.weight * var_weights
+                outputs = F.linear(features, weighted_weights, classifier.bias)
+            else:
                 outputs = classifier(features)
 
             loss = criterion(outputs, labels)
@@ -198,12 +187,11 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 with torch.no_grad():
                     features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
                 
-                # if boost_gradients_with_variance:
-                #     var_weights = variance_tracker.variance_weights().view(1, -1)
-                #     _log_vars(variance_tracker.variance())
-                #     weighted_weights = classifier.weight * var_weights
-                #     outputs = F.linear(features, weighted_weights, classifier.bias)
-                # else:
+                if boost_gradients_with_variance:
+                    var_weights = variance_tracker.variance_weights().view(1, -1)
+                    weighted_weights = classifier.weight * var_weights
+                    outputs = F.linear(features, weighted_weights, classifier.bias)
+                else:
                     outputs = classifier(features)
 
                 loss = criterion(outputs, labels)
