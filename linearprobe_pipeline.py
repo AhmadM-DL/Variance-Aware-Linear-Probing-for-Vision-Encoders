@@ -33,8 +33,20 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
     history = checkpoint['history']
     return classifier, optimizer, epoch, history, variance_tracker
 
+class WeightGradScaler(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, W, scale_vec):
+        ctx.save_for_backward(scale_vec)
+        return W
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (scale_vec,) = ctx.saved_tensors
+        scaled = grad_output * scale_vec
+        return scaled, None
+
 def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
-          encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_multiplier = 30,
+          encoder_target_dim=768, num_workers=4, learning_rate=1e-3,
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1,
           verbose=True):
     
@@ -88,8 +100,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
     escaped_encoder_name = encoder_name.replace("/", "_")
     escaped_dataset_name = dataset_name.replace("/", "_")
     boosted = "boosted" if boost_gradients_with_variance else "vanilla"
-    variance_multiplier_name = variance_multiplier if boost_gradients_with_variance else "x"
-    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{boosted}_{variance_multiplier_name}.pt"
+    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{boosted}.pt"
     chkpt_filepath = os.path.join(chkpt_path, chkpt_filename)
     if os.path.exists(chkpt_filepath):
         classifier, optimizer, start_epoch, history, variance_tracker = load_checkpoint(chkpt_filepath, classifier, optimizer, variance_tracker) 
@@ -119,9 +130,9 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             if boost_gradients_with_variance:
                 variance_tracker.update(features)
                 var_weights = variance_tracker.variance_weights().view(1, -1)
+                scaled_weights = WeightGradScaler.apply(classifier.weight, var_weights)
+                outputs = features @ scaled_weights.T + classifier.bias
                 _log_vars(variance_tracker.variance())
-                weighted_weights = classifier.weight * var_weights * variance_multiplier
-                outputs = F.linear(features, weighted_weights, classifier.bias)
             else:
                 outputs = classifier(features)
             loss = criterion(outputs, labels)
