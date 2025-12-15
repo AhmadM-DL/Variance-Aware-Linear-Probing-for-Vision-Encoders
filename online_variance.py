@@ -37,7 +37,7 @@ class WelfordOnlineVariance:
         return self.M2 / (self.n - 1)  
     
     def moving_average_variance(self):
-        return torch.stack(list(self.queue)).mean()
+        return torch.stack(list(self.queue)).mean(dim=0)
     
     def variance_weights(self):
         if self.n < self.active_threshold:
