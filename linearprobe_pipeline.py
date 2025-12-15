@@ -96,8 +96,8 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
     escaped_encoder_name = encoder_name.replace("/", "_")
     escaped_dataset_name = dataset_name.replace("/", "_")
     boosted = "boosted" if boost_gradients_with_variance else "vanilla"
-    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{boosted}.pt"
-    chkpt_filepath = os.path.join(chkpt_path, chkpt_filename)
+    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{boosted}"
+    chkpt_filepath = os.path.join(chkpt_path, f"{chkpt_filename}.pt")
     if os.path.exists(chkpt_filepath):
         classifier, optimizer, start_epoch, history, variance_tracker = load_checkpoint(chkpt_filepath, classifier, optimizer, variance_tracker) 
     else:
@@ -128,8 +128,8 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 var_weights = variance_tracker.variance_weights()
                 classifier.weight.register_hook(make_grad_hook(var_weights))
                 outputs = classifier(features)
-                _log_vars(variance_tracker.variance(), chkpt_path, f"{encoder_name}_{dataset_name}_{boosted}_var_logs")
-                _log_vars(var_weights, chkpt_path, f"{encoder_name}_{dataset_name}_{boosted}_var_logs_weights")
+                _log_vars(variance_tracker.variance(), chkpt_path, f"{chkpt_filename}_var_logs")
+                _log_vars(var_weights, chkpt_path, f"{chkpt_filename}_var_logs_weights")
 
             else:
                 outputs = classifier(features)
