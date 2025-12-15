@@ -1,12 +1,14 @@
-import torch, os
-from torch.functional import F
+import torch
+from collections import deque
 
 class WelfordOnlineVariance:
-    def __init__(self, num_features, active_threshold=200, device='cuda'):
+    def __init__(self, num_features, active_threshold=200, moving_average_window= 10, device='cuda'):
         self.n = 0
         self.mean = torch.zeros(num_features, device=device)
         self.M2 = torch.zeros(num_features, device=device)
         self.active_threshold = active_threshold
+        self.moving_average_window = moving_average_window
+        self.queue = deque(maxlen=moving_average_window)
 
     @torch.no_grad()
     def update(self, x):
@@ -29,14 +31,20 @@ class WelfordOnlineVariance:
         batch_var = x.var(dim=0, unbiased=False)
         self.M2 += batch_var * batch_size + delta**2 * (batch_size * (self.n - batch_size) / self.n)
 
+        self.queue.append(self.variance())
+
     def variance(self):
         return self.M2 / (self.n - 1)  
+    
+    def moving_avg_variance(self):
+        return torch.stack(list(self.queue)).mean()
     
     def variance_weights(self):
         if self.n < self.active_threshold:
             return torch.ones_like(self.mean)
         else:
-            var = self.variance()
+            var = self.moving_average_variance()
+            var = torch.log(var+1e-8)
             return (var - var.min()) / (var.max() - var.min() + 1e-8)
     
 def _test_welford_online_variance():
