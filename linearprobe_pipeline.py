@@ -129,6 +129,8 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 classifier.weight.register_hook(make_grad_hook(var_weights))
                 outputs = classifier(features)
                 _log_vars(variance_tracker.variance(), chkpt_path, f"{encoder_name}_{dataset_name}_{boosted}_var_logs")
+                _log_vars(var_weights, chkpt_path, f"{encoder_name}_{dataset_name}_{boosted}_var_logs_weights")
+
             else:
                 outputs = classifier(features)
             loss = criterion(outputs, labels)
