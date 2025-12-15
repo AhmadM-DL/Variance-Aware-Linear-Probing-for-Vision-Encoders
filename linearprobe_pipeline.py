@@ -128,7 +128,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 var_weights = variance_tracker.variance_weights()
                 classifier.weight.register_hook(make_grad_hook(var_weights))
                 outputs = classifier(features)
-                _log_vars(variance_tracker.variance(), chkpt_path)
+                _log_vars(variance_tracker.variance(), chkpt_path, f"{encoder_name}_{dataset_name}_{boosted}_var_logs")
             else:
                 outputs = classifier(features)
             loss = criterion(outputs, labels)
@@ -233,11 +233,11 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
 
         save_checkpoint(chkpt_filepath, classifier, optimizer, epoch + 1, history, hyperparams, variance_tracker)
 
-def _log_vars(var, path="./"):
+def _log_vars(var, path="./", filename="val_logs"):
     var = var.tolist()
     log_vars = bool(os.environ.get("LOG_VARIANCE", "False"))
     if log_vars:
-        path = os.path.join(path, "var_logs.json")
+        path = os.path.join(path, f"{filename}.json")
         if os.path.exists(path):
             with open(path, "r") as f:
                 prev_vars = json.load(f)
