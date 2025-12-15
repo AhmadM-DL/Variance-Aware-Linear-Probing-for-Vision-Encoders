@@ -1,14 +1,30 @@
 import torch
 from collections import deque
+from enum import Enum
+
+class Normalization(Enum):
+    NONE = "none"
+    MIN_MAX = "min_max"
+    SOFTMAX_T = "softmax_t"
+
+
 
 class WelfordOnlineVariance:
-    def __init__(self, num_features, active_threshold=200, moving_average_window= 10, device='cuda'):
+    def __init__(self, num_features,
+                active_threshold=200,
+                moving_average_window= 10,
+                normalization=Normalization.MIN_MAX,
+                temperature=1.0,
+                device='cuda'):
+        
         self.n = 0
         self.mean = torch.zeros(num_features, device=device)
         self.M2 = torch.zeros(num_features, device=device)
         self.active_threshold = active_threshold
         self.moving_average_window = moving_average_window
         self.queue = deque(maxlen=moving_average_window)
+        self.normalization = normalization
+        self.temperute = temperature
 
     @torch.no_grad()
     def update(self, x):
@@ -44,9 +60,20 @@ class WelfordOnlineVariance:
             return torch.ones_like(self.mean)
         else:
             var = self.moving_average_variance()
-            # var = torch.log(var+1e-8)
-            return (var - var.min()) / (var.max() - var.min() + 1e-8)
-    
+            return _normalize(var, norm=self.normalization, temperature=self.temperature)
+
+def _normalize(x, norm: Normalization, temperature: float = 1.0, eps: float = 1e-8):
+    if norm == Normalization.NONE:
+        return x
+
+    if norm == Normalization.MIN_MAX:
+        return (x - x.min()) / (x.max() - x.min() + eps)
+
+    if norm == Normalization.SOFTMAX_T:
+        return torch.softmax(x / temperature, dim=-1)
+
+    raise ValueError(f"Unknown normalization: {norm}")
+
 def _test_welford_online_variance():
     torch.manual_seed(42)
     num_samples = 1_000

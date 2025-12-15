@@ -1,6 +1,6 @@
 from encoders import get_encoder, get_features
 from datasets import get_dataset
-from online_variance import WelfordOnlineVariance
+from online_variance import WelfordOnlineVariance, Normalization
 from torch.utils.data.dataloader import DataLoader
 import torch , os
 from torch.functional import F
@@ -39,7 +39,7 @@ def make_grad_hook(weights):
     return hook
 
 def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
-          encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10, boosting_active_threshold=1000,
+          encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10, boosting_active_threshold=1000, variance_normalization=Normalization.SOFTMAX_T, temperature=1,
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1,
           verbose=True):
     
@@ -78,7 +78,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
 
     if verbose: print("Setting up online varience weighting ...")
     if boost_gradients_with_variance:
-        variance_tracker = WelfordOnlineVariance(encoder_target_dim, active_threshold=boosting_active_threshold, moving_average_window=variance_tracker_window, device= device)
+        variance_tracker = WelfordOnlineVariance(encoder_target_dim, active_threshold=boosting_active_threshold, moving_average_window=variance_tracker_window, normalization=variance_normalization, temperature= temperature, device= device)
     else:
         variance_tracker = None
 
