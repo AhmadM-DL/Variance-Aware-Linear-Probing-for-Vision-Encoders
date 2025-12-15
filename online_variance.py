@@ -24,7 +24,7 @@ class WelfordOnlineVariance:
         self.moving_average_window = moving_average_window
         self.queue = deque(maxlen=moving_average_window)
         self.normalization = normalization
-        self.temperute = temperature
+        self.temperature = temperature
 
     @torch.no_grad()
     def update(self, x):
