@@ -127,7 +127,6 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
                 variance_tracker.update(features)
                 var_weights = variance_tracker.variance_weights()
                 classifier.weight.register_hook(make_grad_hook(var_weights))
-                classifier.bias.register_hook(make_grad_hook(var_weights))
                 outputs = classifier(features)
                 _log_vars(variance_tracker.variance(), chkpt_path)
             else:
