@@ -44,7 +44,7 @@ class WelfordOnlineVariance:
             return torch.ones_like(self.mean)
         else:
             var = self.moving_average_variance()
-            var = torch.log(var+1e-8)
+            # var = torch.log(var+1e-8)
             return (var - var.min()) / (var.max() - var.min() + 1e-8)
     
 def _test_welford_online_variance():
