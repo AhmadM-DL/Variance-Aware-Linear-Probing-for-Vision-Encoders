@@ -70,7 +70,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10,
           boosting_active_threshold=1000, variance_normalization=Normalization.SOFTMAX_T, temperature=1,
           boosting_rate=10, boosting_method = BoostingMethod.GRADIENTS,
-          random_state=42, chkpt_path="./chkpt", test_every_x_steps=1,
+          random_state=42, chkpt_path="./chkpt", test_every_x_steps=1, validate= False,
           verbose=True):
     
     # Set random seed for reproducibility
@@ -184,43 +184,47 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
         tqdm.write(f"Epoch {epoch+1}/{n_epochs}, Train Loss: {train_loss:.4f}")
 
         # Validation loop
-        classifier.eval()
-        val_losses = []
-        val_preds = []
-        val_labels = []
-        pbar = tqdm(val_dataloader, desc=f'Validation Epoch {epoch+1}/{n_epochs}')
-        for batch in pbar:
-            inputs, labels = batch
-            inputs = inputs.to(device)
-            labels = labels.to(device)  
+        if validate:
+            classifier.eval()
+            val_losses = []
+            val_preds = []
+            val_labels = []
+            pbar = tqdm(val_dataloader, desc=f'Validation Epoch {epoch+1}/{n_epochs}')
+            for batch in pbar:
+                inputs, labels = batch
+                inputs = inputs.to(device)
+                labels = labels.to(device)  
+                
+                with torch.no_grad():
+                    features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
+                
+                # if boost_gradients_with_variance:
+                #     var_weights = variance_tracker.variance_weights().view(1, -1)
+                #     weighted_weights = classifier.weight * var_weights * weight_multiplier
+                #     outputs = F.linear(features, weighted_weights, classifier.bias)
+                # else:
+                    outputs = classifier(features)
+
+                loss = criterion(outputs, labels)
+                val_losses.append(loss.item())
+                pbar.set_postfix({"Val Loss": loss.item()})
+
+                if train_dataset.is_multilabel():
+                    predicted = (torch.sigmoid(outputs) > 0.5).int()
+                    val_preds.extend(predicted.flatten().cpu().numpy())
+                    val_labels.extend(labels.flatten().cpu().numpy())
+                else:
+                    _, predicted = torch.max(outputs.data, 1)
+                    val_preds.extend(predicted.cpu().numpy())
+                    val_labels.extend(labels.cpu().numpy())
+
+            val_loss = sum(val_losses) / len(val_losses)
+            val_acc = 100.0 * (np.array(val_preds) == np.array(val_labels)).sum() / len(val_labels)
+            tqdm.write(f"Epoch {epoch+1}/{n_epochs}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.2f}%")
+        else:
+            val_loss = None
+            val_acc = None
             
-            with torch.no_grad():
-                features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
-            
-            # if boost_gradients_with_variance:
-            #     var_weights = variance_tracker.variance_weights().view(1, -1)
-            #     weighted_weights = classifier.weight * var_weights * weight_multiplier
-            #     outputs = F.linear(features, weighted_weights, classifier.bias)
-            # else:
-                outputs = classifier(features)
-
-            loss = criterion(outputs, labels)
-            val_losses.append(loss.item())
-            pbar.set_postfix({"Val Loss": loss.item()})
-
-            if train_dataset.is_multilabel():
-                predicted = (torch.sigmoid(outputs) > 0.5).int()
-                val_preds.extend(predicted.flatten().cpu().numpy())
-                val_labels.extend(labels.flatten().cpu().numpy())
-            else:
-                _, predicted = torch.max(outputs.data, 1)
-                val_preds.extend(predicted.cpu().numpy())
-                val_labels.extend(labels.cpu().numpy())
-
-        val_loss = sum(val_losses) / len(val_losses)
-        val_acc = 100.0 * (np.array(val_preds) == np.array(val_labels)).sum() / len(val_labels)
-        tqdm.write(f"Epoch {epoch+1}/{n_epochs}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.2f}%")
-
         # Testing loop
         if (epoch+1) % test_every_x_steps == 0:
             classifier.eval()
