@@ -36,13 +36,20 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
 class GradBooster:
     def __init__(self):
         self.weights = None
+        self.rate = None
+
+    def set(self, weigths, rate):
+        self.weights = weigths
+        self.rate = rate
 
     def hook(self, grad):
         return grad * self.weights.unsqueeze(0)
 
 
 def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
-          encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10, boosting_active_threshold=1000, variance_normalization=Normalization.SOFTMAX_T, temperature=1,
+          encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10,
+          boosting_active_threshold=1000, variance_normalization=Normalization.SOFTMAX_T, temperature=1,
+          boosting_rate=10,
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1,
           verbose=True):
     
@@ -133,7 +140,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             if boost_gradients_with_variance:
                 variance_tracker.update(features)
                 var_weights = variance_tracker.variance_weights()
-                grad_booster.weights = var_weights
+                grad_booster.set(var_weights, boosting_rate)
                 outputs = classifier(features)
                 _log_vars(variance_tracker.variance(), chkpt_path, f"{chkpt_filename}_var_logs")
                 _log_vars(var_weights, chkpt_path, f"{chkpt_filename}_var_logs_weights")
