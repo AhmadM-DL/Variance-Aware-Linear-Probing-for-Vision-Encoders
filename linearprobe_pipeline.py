@@ -50,6 +50,21 @@ class GradBooster:
     def hook(self, grad):
         return grad * self.weights.unsqueeze(0) * self.rate
 
+def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_tracker_window,
+                     boosting_active_threshold, variance_normalization, temperature, boosting_method,
+                     boosting_rate):
+    escaped_encoder_name = encoder_name.split("/")[1][:6]
+    if boost_with_variance:
+        variance_tracker_window_name = f"vtw({variance_tracker_window})"
+        boosting_active_threshold_name = f"bathre({boosting_active_threshold})"
+        normalization_method_name = variance_normalization.name[:6]
+        temperature_name = f"tmp({temperature})"
+        boosting_method_name = boosting_method.name[:4]
+        boosting_rate_name = f"bstrate({boosting_rate})"
+        chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_B_{variance_tracker_window_name}_{boosting_active_threshold_name}_{normalization_method_name}_{temperature_name}_{boosting_method_name}_{boosting_rate_name}"
+    else:
+        chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_V"
+    return chkpt_filename
 
 def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64, n_epochs= 20,
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10,
@@ -115,10 +130,10 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
 
     # Load checkpoint
     if verbose: print("Loading checkpoint ...")
-    escaped_encoder_name = encoder_name.replace("/", "_")
-    escaped_dataset_name = dataset_name.replace("/", "_")
-    boosted = "boosted" if boost_with_variance else "vanilla"
-    chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{boosted}"
+    chkpt_filename = get_exp_filename(encoder_name, dataset_name, boost_with_variance,
+                                      variance_tracker_window, boosting_active_threshold,
+                                      variance_normalization, temperature, boosting_method,
+                                      boosting_rate)
     chkpt_filepath = os.path.join(chkpt_path, f"{chkpt_filename}.pt")
     if os.path.exists(chkpt_filepath):
         classifier, optimizer, start_epoch, history, variance_tracker = load_checkpoint(chkpt_filepath, classifier, optimizer, variance_tracker) 
