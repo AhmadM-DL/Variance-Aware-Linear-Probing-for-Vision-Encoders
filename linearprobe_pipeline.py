@@ -7,6 +7,11 @@ from torch.functional import F
 from tqdm.notebook import tqdm
 import numpy as np
 import json
+from enum import Enum
+
+class BoostingMethod(Enum):
+    GRADIENTS = "gradients"
+    WEIGHTS = "weights"
 
 def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, variance_tracker= None, weights_only=False):
     checkpoint = {
@@ -46,10 +51,10 @@ class GradBooster:
         return grad * self.weights.unsqueeze(0) * self.rate
 
 
-def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
+def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64, n_epochs= 20,
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10,
           boosting_active_threshold=1000, variance_normalization=Normalization.SOFTMAX_T, temperature=1,
-          boosting_rate=10,
+          boosting_rate=10, boosting_method = BoostingMethod.GRADIENTS,
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1,
           verbose=True):
     
@@ -87,9 +92,12 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
     val_dataloader = DataLoader(val_dataset, batch_size, shuffle= False, num_workers= num_workers)
 
     if verbose: print("Setting up online varience weighting ...")
-    if boost_gradients_with_variance:
+    if boost_with_variance:
         variance_tracker = WelfordOnlineVariance(encoder_target_dim, active_threshold=boosting_active_threshold, moving_average_window=variance_tracker_window, normalization=variance_normalization, temperature= temperature, device= device)
-        grad_booster = GradBooster()
+        if boosting_method == BoostingMethod.GRADIENTS:
+            grad_booster = GradBooster()
+        else:
+            None
     else:
         variance_tracker = None
         grad_booster = None
@@ -97,7 +105,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
     # Define classifier
     if verbose: print("Defining classifier ...")
     classifier = torch.nn.Linear(encoder_target_dim, train_dataset.num_labels())
-    if boost_gradients_with_variance:
+    if boost_with_variance and boosting_method==BoostingMethod.GRADIENTS:
         classifier.weight.register_hook(grad_booster.hook)
     classifier.to(device)
 
@@ -109,7 +117,7 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
     if verbose: print("Loading checkpoint ...")
     escaped_encoder_name = encoder_name.replace("/", "_")
     escaped_dataset_name = dataset_name.replace("/", "_")
-    boosted = "boosted" if boost_gradients_with_variance else "vanilla"
+    boosted = "boosted" if boost_with_variance else "vanilla"
     chkpt_filename = f"{escaped_encoder_name}_{escaped_dataset_name}_{boosted}"
     chkpt_filepath = os.path.join(chkpt_path, f"{chkpt_filename}.pt")
     if os.path.exists(chkpt_filepath):
@@ -137,13 +145,17 @@ def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batc
             labels = labels.to(device)
             with torch.no_grad():
                 features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
-            if boost_gradients_with_variance:
+            if boost_with_variance:
                 variance_tracker.update(features)
                 var_weights = variance_tracker.variance_weights()
-                grad_booster.set(var_weights, boosting_rate)
-                outputs = classifier(features)
                 _log_vars(variance_tracker.variance(), chkpt_path, f"{chkpt_filename}_var_logs")
                 _log_vars(var_weights, chkpt_path, f"{chkpt_filename}_var_logs_weights")
+                if boosting_method == BoostingMethod.GRADIENTS:
+                    grad_booster.set(var_weights, boosting_rate)
+                    outputs = classifier(features)
+                if boosting_method == BoostingMethod.WEIGHTS:
+                    classifier.weights = classifier.weights * var_weights * boosting_rate
+                    outputs = classifier(features)
             else:
                 outputs = classifier(features)
             loss = criterion(outputs, labels)
