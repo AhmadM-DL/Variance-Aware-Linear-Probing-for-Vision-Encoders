@@ -43,7 +43,7 @@ class GradBooster:
         self.rate = rate
 
     def hook(self, grad):
-        return grad * self.weights.unsqueeze(0)
+        return grad * self.weights.unsqueeze(0) * rate
 
 
 def probe(encoder_name, dataset_name, boost_gradients_with_variance= False, batch_size= 64, n_epochs= 20,
