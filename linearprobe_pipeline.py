@@ -168,9 +168,11 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 if boosting_method == BoostingMethod.GRADIENTS:
                     grad_booster.set(var_weights, boosting_rate)
                     outputs = classifier(features)
-                if boosting_method == BoostingMethod.WEIGHTS:
+                elif boosting_method == BoostingMethod.WEIGHTS:
                     classifier.weight = classifier.weight * var_weights * boosting_rate
                     outputs = classifier(features)
+                else:
+                    raise Exception("Not supported boosting method.")
             else:
                 outputs = classifier(features)
             loss = criterion(outputs, labels)
