@@ -169,7 +169,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     grad_booster.set(var_weights, boosting_rate)
                     outputs = classifier(features)
                 if boosting_method == BoostingMethod.WEIGHTS:
-                    classifier.weights = classifier.weights * var_weights * boosting_rate
+                    classifier.weight = classifier.weight * var_weights * boosting_rate
                     outputs = classifier(features)
             else:
                 outputs = classifier(features)
