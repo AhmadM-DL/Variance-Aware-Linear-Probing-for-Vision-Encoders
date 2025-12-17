@@ -232,7 +232,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.WEIGHTS:
                     with torch.no_grad():
-                        classifier.weight.mul_(var_weights.view(-1,1))
+                        classifier.weight.mul_(var_weights.view(1,-1))
                     outputs = classifier(features)
                 else:
                     raise Exception("Not supported boosting method.")
