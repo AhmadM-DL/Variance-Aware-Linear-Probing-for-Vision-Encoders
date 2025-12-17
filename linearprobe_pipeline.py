@@ -6,7 +6,7 @@ import torch , os
 from torch.functional import F
 from tqdm.notebook import tqdm
 import numpy as np
-import json
+import json, re
 from enum import Enum
 
 class BoostingMethod(Enum):
@@ -50,6 +50,7 @@ class GradBooster:
     def hook(self, grad):
         return grad * self.weights.unsqueeze(0) * self.rate
 
+
 import re
 
 def parse_exp_filename(
@@ -62,7 +63,7 @@ def parse_exp_filename(
     escaped_encoder_name = tokens[0]
     dataset_name = tokens[1]
 
-    # No boosting
+    # ---- No boosting ----
     if tokens[2] == "V":
         return {
             "escaped_encoder_name": escaped_encoder_name,
@@ -76,39 +77,47 @@ def parse_exp_filename(
             "boosting_rate": None,
         }
 
-    boost_with_variance = True
-
-    # Extract by markers (order-independent, underscore-safe)
+    # ---- Numeric params ----
     vtw = int(re.search(r"vtw\((.*?)\)", filename).group(1))
     bathre = int(re.search(r"bathre\((.*?)\)", filename).group(1))
     tmp = float(re.search(r"tmp\((.*?)\)", filename).group(1))
     bstrate = float(re.search(r"bstrate\((.*?)\)", filename).group(1))
 
-    # Remaining middle tokens contain:
-    # ... _B_ <NORMALIZATION> _ tmp(...) _ <BOOSTING_METHOD> _ bstrate(...)
-    middle = filename.split("_B_")[1]
+    # ---- Extract PREFIXES exactly as stored ----
+    # layout:
+    # _B_ vtw(...) _ bathre(...) _ <NORM_PREFIX> _ tmp(...) _ <METHOD_PREFIX> _ bstrate(...)
+    after_b = filename.split("_B_")[1]
 
-    middle = re.sub(r"vtw\(.*?\)|bathre\(.*?\)|tmp\(.*?\)|bstrate\(.*?\)", "", middle)
-    middle = [t for t in middle.split("_") if t]
+    parts = after_b.split("_")
 
-    # middle now = [normalization_name, boosting_method_name]
-    normalization_name = middle[0]
-    boosting_method_name = middle[1]
+    norm_prefix = parts[2]     # exactly name[:6]
+    method_prefix = parts[4]   # exactly name[:4]
 
+    # ---- Enum recovery via prefix ----
     variance_normalization = next(
-        e for e in variance_normalization_enum
-        if e.name.startswith(normalization_name)
+        (e for e in variance_normalization_enum if e.name.startswith(norm_prefix)),
+        None
     )
 
     boosting_method = next(
-        e for e in boosting_method_enum
-        if e.name.startswith(boosting_method_name)
+        (e for e in boosting_method_enum if e.name.startswith(method_prefix)),
+        None
     )
+
+    if variance_normalization is None:
+        raise ValueError(
+            f"No variance_normalization matches prefix '{norm_prefix}'"
+        )
+
+    if boosting_method is None:
+        raise ValueError(
+            f"No boosting_method matches prefix '{method_prefix}'"
+        )
 
     return {
         "escaped_encoder_name": escaped_encoder_name,
         "dataset_name": dataset_name,
-        "boost_with_variance": boost_with_variance,
+        "boost_with_variance": True,
         "variance_tracker_window": vtw,
         "boosting_active_threshold": bathre,
         "variance_normalization": variance_normalization,
