@@ -50,6 +50,56 @@ class GradBooster:
     def hook(self, grad):
         return grad * self.weights.unsqueeze(0) * self.rate
 
+def parse_exp_filename( filename, variance_normalization_enum, boosting_method_enum ):
+    parts = filename.split("_")
+
+    escaped_encoder_name = parts[0]
+    dataset_name = parts[1]
+
+    if parts[2] == "V":
+        return {
+            "escaped_encoder_name": escaped_encoder_name,
+            "dataset_name": dataset_name,
+            "boost_with_variance": False,
+            "variance_tracker_window": None,
+            "boosting_active_threshold": None,
+            "variance_normalization": None,
+            "temperature": None,
+            "boosting_method": None,
+            "boosting_rate": None,
+        }
+
+    boost_with_variance = True
+
+    variance_tracker_window = int(parts[3][4:-1])      # vtw(x)
+    boosting_active_threshold = int(parts[4][7:-1])    # bathre(x)
+    normalization_prefix = parts[5]
+    temperature = float(parts[6][4:-1])                # tmp(x)
+    boosting_method_prefix = parts[7]
+    boosting_rate = float(parts[8][8:-1])               # bstrate(x)
+
+    variance_normalization = next(
+        e for e in variance_normalization_enum
+        if e.name.startswith(normalization_prefix)
+    )
+
+    boosting_method = next(
+        e for e in boosting_method_enum
+        if e.name.startswith(boosting_method_prefix)
+    )
+
+    return {
+        "escaped_encoder_name": escaped_encoder_name,
+        "dataset_name": dataset_name,
+        "boost_with_variance": boost_with_variance,
+        "variance_tracker_window": variance_tracker_window,
+        "boosting_active_threshold": boosting_active_threshold,
+        "variance_normalization": variance_normalization,
+        "temperature": temperature,
+        "boosting_method": boosting_method,
+        "boosting_rate": boosting_rate,
+    }
+       
 def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_tracker_window,
                      boosting_active_threshold, variance_normalization, temperature, boosting_method,
                      boosting_rate):
