@@ -50,13 +50,20 @@ class GradBooster:
     def hook(self, grad):
         return grad * self.weights.unsqueeze(0) * self.rate
 
-def parse_exp_filename( filename, variance_normalization_enum, boosting_method_enum ):
-    parts = filename.split("_")
+import re
 
-    escaped_encoder_name = parts[0]
-    dataset_name = parts[1]
+def parse_exp_filename(
+    filename,
+    variance_normalization_enum,
+    boosting_method_enum
+):
+    tokens = filename.split("_")
 
-    if parts[2] == "V":
+    escaped_encoder_name = tokens[0]
+    dataset_name = tokens[1]
+
+    # No boosting
+    if tokens[2] == "V":
         return {
             "escaped_encoder_name": escaped_encoder_name,
             "dataset_name": dataset_name,
@@ -71,33 +78,43 @@ def parse_exp_filename( filename, variance_normalization_enum, boosting_method_e
 
     boost_with_variance = True
 
-    variance_tracker_window = int(parts[3][4:-1])      # vtw(x)
-    boosting_active_threshold = int(parts[4][7:-1])    # bathre(x)
-    normalization_prefix = parts[5]
-    temperature = float(parts[6][4:-1])                # tmp(x)
-    boosting_method_prefix = parts[7]
-    boosting_rate = float(parts[8][8:-1])               # bstrate(x)
+    # Extract by markers (order-independent, underscore-safe)
+    vtw = int(re.search(r"vtw\((.*?)\)", filename).group(1))
+    bathre = int(re.search(r"bathre\((.*?)\)", filename).group(1))
+    tmp = float(re.search(r"tmp\((.*?)\)", filename).group(1))
+    bstrate = float(re.search(r"bstrate\((.*?)\)", filename).group(1))
+
+    # Remaining middle tokens contain:
+    # ... _B_ <NORMALIZATION> _ tmp(...) _ <BOOSTING_METHOD> _ bstrate(...)
+    middle = filename.split("_B_")[1]
+
+    middle = re.sub(r"vtw\(.*?\)|bathre\(.*?\)|tmp\(.*?\)|bstrate\(.*?\)", "", middle)
+    middle = [t for t in middle.split("_") if t]
+
+    # middle now = [normalization_name, boosting_method_name]
+    normalization_name = middle[0]
+    boosting_method_name = middle[1]
 
     variance_normalization = next(
         e for e in variance_normalization_enum
-        if e.name.startswith(normalization_prefix)
+        if e.name.startswith(normalization_name)
     )
 
     boosting_method = next(
         e for e in boosting_method_enum
-        if e.name.startswith(boosting_method_prefix)
+        if e.name.startswith(boosting_method_name)
     )
 
     return {
         "escaped_encoder_name": escaped_encoder_name,
         "dataset_name": dataset_name,
         "boost_with_variance": boost_with_variance,
-        "variance_tracker_window": variance_tracker_window,
-        "boosting_active_threshold": boosting_active_threshold,
+        "variance_tracker_window": vtw,
+        "boosting_active_threshold": bathre,
         "variance_normalization": variance_normalization,
-        "temperature": temperature,
+        "temperature": tmp,
         "boosting_method": boosting_method,
-        "boosting_rate": boosting_rate,
+        "boosting_rate": bstrate,
     }
        
 def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_tracker_window,
