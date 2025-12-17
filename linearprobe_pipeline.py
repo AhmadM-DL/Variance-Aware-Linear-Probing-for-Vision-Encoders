@@ -48,14 +48,11 @@ class GradBooster:
     def hook(self, grad):
         return grad * self.weights.unsqueeze(0)
 
-def parse_exp_filename(filename,):
-    tokens = filename.split("_")
-
-    escaped_encoder_name = tokens[0]
-    dataset_name = tokens[1]
-
-    # ---- No boosting ----
-    if tokens[2] == "V":
+def parse_exp_filename(filename):
+    parts = filename.split("_")
+    escaped_encoder_name = parts[0]
+    dataset_name = parts[1]
+    if parts[2] == "V":
         return {
             "escaped_encoder_name": escaped_encoder_name,
             "dataset_name": dataset_name,
@@ -63,56 +60,46 @@ def parse_exp_filename(filename,):
             "variance_tracker_window": None,
             "boosting_active_threshold": None,
             "variance_normalization": None,
-            "temperature": None,
             "boosting_method": None,
         }
-
-    # ---- Numeric params ----
-    vtw = int(re.search(r"vtw\((.*?)\)", filename).group(1))
-    bathre = int(re.search(r"bathre\((.*?)\)", filename).group(1))
-
-    # ---- Extract enum PREFIXES by POSITION RELATIVE TO MARKERS ----
-    after_b = filename.split("_B_")[1]
-
-    # normalization prefix = between bathre(...) and tmp(...)
-    norm_part = re.search(
-        r"bathre\(.*?\)_(.*?)_tmp\(",
-        after_b
-    ).group(1)
-
-    # boosting method prefix = between tmp(...) and bstrate(...)
-    method_part = re.search(
-        r"tmp\(.*?\)_(.*?)_bstrate\(",
-        after_b
-    ).group(1)
-
-    # ---- Enum recovery via prefix ----
+    
+    boost_with_variance = True
+    
+    vtw_match = re.search(r"vtw\((\d+)\)", filename)
+    bathre_match = re.search(r"bathre\((\d+)\)", filename)
+    
+    if not vtw_match or not bathre_match:
+        raise ValueError(f"Cannot parse variance tracker or threshold from filename: {filename}")
+    
+    variance_tracker_window = int(vtw_match.group(1))
+    boosting_active_threshold = int(bathre_match.group(1))
+    
+    after_bathre = filename.split(f"bathre({boosting_active_threshold})_")[1]
+    name_parts = after_bathre.split("_")
+    
+    norm_prefix = name_parts[0].replace("-", "_") 
+    method_prefix = name_parts[1].replace("-", "_")
+    
     variance_normalization = next(
-        (e for e in Normalization if e.name.startswith(norm_part)),
+        (e for e in Normalization if e.name.startswith(norm_prefix)),
         None
     )
-
     boosting_method = next(
-        (e for e in BoostingMethod if e.name.startswith(method_part)),
+        (e for e in BoostingMethod if e.name.startswith(method_prefix)),
         None
     )
-
+    
     if variance_normalization is None:
-        raise ValueError(
-            f"No variance_normalization matches prefix '{norm_part}'"
-        )
-
+        raise ValueError(f"No variance_normalization matches prefix '{norm_prefix}'")
     if boosting_method is None:
-        raise ValueError(
-            f"No boosting_method matches prefix '{method_part}'"
-        )
-
+        raise ValueError(f"No boosting_method matches prefix '{method_prefix}'")
+    
     return {
         "escaped_encoder_name": escaped_encoder_name,
         "dataset_name": dataset_name,
-        "boost_with_variance": True,
-        "variance_tracker_window": vtw,
-        "boosting_active_threshold": bathre,
+        "boost_with_variance": boost_with_variance,
+        "variance_tracker_window": variance_tracker_window,
+        "boosting_active_threshold": boosting_active_threshold,
         "variance_normalization": variance_normalization,
         "boosting_method": boosting_method,
     }
@@ -123,8 +110,8 @@ def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_t
     if boost_with_variance:
         variance_tracker_window_name = f"vtw({variance_tracker_window})"
         boosting_active_threshold_name = f"bathre({boosting_active_threshold})"
-        normalization_method_name = variance_normalization.name[:6]
-        boosting_method_name = boosting_method.name[:4]
+        normalization_method_name = variance_normalization.name[:6].replace("_", "-")
+        boosting_method_name = boosting_method.name[:4].replace("_", "-")
         chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_B_{variance_tracker_window_name}_{boosting_active_threshold_name}_{normalization_method_name}_{boosting_method_name}"
     else:
         chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_V"
