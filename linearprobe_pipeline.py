@@ -41,20 +41,14 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
 class GradBooster:
     def __init__(self):
         self.weights = None
-        self.rate = None
 
-    def set(self, weigths, rate):
+    def set(self, weigths):
         self.weights = weigths
-        self.rate = rate
 
     def hook(self, grad):
-        return grad * self.weights.unsqueeze(0) * self.rate
+        return grad * self.weights.unsqueeze(0)
 
-def parse_exp_filename(
-    filename,
-    variance_normalization_enum,
-    boosting_method_enum
-):
+def parse_exp_filename(filename,):
     tokens = filename.split("_")
 
     escaped_encoder_name = tokens[0]
@@ -71,14 +65,11 @@ def parse_exp_filename(
             "variance_normalization": None,
             "temperature": None,
             "boosting_method": None,
-            "boosting_rate": None,
         }
 
     # ---- Numeric params ----
     vtw = int(re.search(r"vtw\((.*?)\)", filename).group(1))
     bathre = int(re.search(r"bathre\((.*?)\)", filename).group(1))
-    tmp = float(re.search(r"tmp\((.*?)\)", filename).group(1))
-    bstrate = float(re.search(r"bstrate\((.*?)\)", filename).group(1))
 
     # ---- Extract enum PREFIXES by POSITION RELATIVE TO MARKERS ----
     after_b = filename.split("_B_")[1]
@@ -97,12 +88,12 @@ def parse_exp_filename(
 
     # ---- Enum recovery via prefix ----
     variance_normalization = next(
-        (e for e in variance_normalization_enum if e.name.startswith(norm_part)),
+        (e for e in Normalization if e.name.startswith(norm_part)),
         None
     )
 
     boosting_method = next(
-        (e for e in boosting_method_enum if e.name.startswith(method_part)),
+        (e for e in BoostingMethod if e.name.startswith(method_part)),
         None
     )
 
@@ -123,31 +114,25 @@ def parse_exp_filename(
         "variance_tracker_window": vtw,
         "boosting_active_threshold": bathre,
         "variance_normalization": variance_normalization,
-        "temperature": tmp,
         "boosting_method": boosting_method,
-        "boosting_rate": bstrate,
     }
        
 def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_tracker_window,
-                     boosting_active_threshold, variance_normalization, temperature, boosting_method,
-                     boosting_rate):
+                     boosting_active_threshold, variance_normalization, boosting_method):
     escaped_encoder_name = encoder_name.split("/")[1][:6]
     if boost_with_variance:
         variance_tracker_window_name = f"vtw({variance_tracker_window})"
         boosting_active_threshold_name = f"bathre({boosting_active_threshold})"
         normalization_method_name = variance_normalization.name[:6]
-        temperature_name = f"tmp({temperature})"
         boosting_method_name = boosting_method.name[:4]
-        boosting_rate_name = f"bstrate({boosting_rate})"
-        chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_B_{variance_tracker_window_name}_{boosting_active_threshold_name}_{normalization_method_name}_{temperature_name}_{boosting_method_name}_{boosting_rate_name}"
+        chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_B_{variance_tracker_window_name}_{boosting_active_threshold_name}_{normalization_method_name}_{boosting_method_name}"
     else:
         chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_V"
     return chkpt_filename
 
 def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64, n_epochs= 20,
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10,
-          boosting_active_threshold=1000, variance_normalization=Normalization.SOFTMAX_T, temperature=1,
-          boosting_rate=10, boosting_method = BoostingMethod.GRADIENTS,
+          boosting_active_threshold=100, variance_normalization=Normalization.MIN_MAX, boosting_method = BoostingMethod.GRADIENTS,
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1, validate= False,
           verbose=True):
     
@@ -186,7 +171,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
 
     if verbose: print("Setting up online varience weighting ...")
     if boost_with_variance:
-        variance_tracker = WelfordOnlineVariance(encoder_target_dim, active_threshold=boosting_active_threshold, moving_average_window=variance_tracker_window, normalization=variance_normalization, temperature= temperature, device= device)
+        variance_tracker = WelfordOnlineVariance(encoder_target_dim, active_threshold=boosting_active_threshold, moving_average_window=variance_tracker_window, normalization=variance_normalization, device= device)
         if boosting_method == BoostingMethod.GRADIENTS:
             grad_booster = GradBooster()
         else:
@@ -210,8 +195,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
     if verbose: print("Loading checkpoint ...")
     chkpt_filename = get_exp_filename(encoder_name, dataset_name, boost_with_variance,
                                       variance_tracker_window, boosting_active_threshold,
-                                      variance_normalization, temperature, boosting_method,
-                                      boosting_rate)
+                                      variance_normalization, boosting_method)
     chkpt_filepath = os.path.join(chkpt_path, f"{chkpt_filename}.pt")
     if os.path.exists(chkpt_filepath):
         classifier, optimizer, start_epoch, history, variance_tracker = load_checkpoint(chkpt_filepath, classifier, optimizer, variance_tracker) 
@@ -244,11 +228,11 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 _log_vars(variance_tracker.variance(), chkpt_path, f"{chkpt_filename}_var_logs")
                 _log_vars(var_weights, chkpt_path, f"{chkpt_filename}_var_logs_weights")
                 if boosting_method == BoostingMethod.GRADIENTS:
-                    grad_booster.set(var_weights, boosting_rate)
+                    grad_booster.set(var_weights)
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.WEIGHTS:
                     with torch.no_grad():
-                        classifier.weight.mul_(var_weights * boosting_rate)
+                        classifier.weight.mul_(var_weights.view(-1,1))
                     outputs = classifier(features)
                 else:
                     raise Exception("Not supported boosting method.")
