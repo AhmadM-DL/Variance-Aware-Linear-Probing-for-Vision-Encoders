@@ -50,9 +50,6 @@ class GradBooster:
     def hook(self, grad):
         return grad * self.weights.unsqueeze(0) * self.rate
 
-
-import re
-
 def parse_exp_filename(
     filename,
     variance_normalization_enum,
@@ -83,35 +80,40 @@ def parse_exp_filename(
     tmp = float(re.search(r"tmp\((.*?)\)", filename).group(1))
     bstrate = float(re.search(r"bstrate\((.*?)\)", filename).group(1))
 
-    # ---- Extract PREFIXES exactly as stored ----
-    # layout:
-    # _B_ vtw(...) _ bathre(...) _ <NORM_PREFIX> _ tmp(...) _ <METHOD_PREFIX> _ bstrate(...)
+    # ---- Extract enum PREFIXES by POSITION RELATIVE TO MARKERS ----
     after_b = filename.split("_B_")[1]
 
-    parts = after_b.split("_")
+    # normalization prefix = between bathre(...) and tmp(...)
+    norm_part = re.search(
+        r"bathre\(.*?\)_(.*?)_tmp\(",
+        after_b
+    ).group(1)
 
-    norm_prefix = parts[2]     # exactly name[:6]
-    method_prefix = parts[4]   # exactly name[:4]
+    # boosting method prefix = between tmp(...) and bstrate(...)
+    method_part = re.search(
+        r"tmp\(.*?\)_(.*?)_bstrate\(",
+        after_b
+    ).group(1)
 
     # ---- Enum recovery via prefix ----
     variance_normalization = next(
-        (e for e in variance_normalization_enum if e.name.startswith(norm_prefix)),
+        (e for e in variance_normalization_enum if e.name.startswith(norm_part)),
         None
     )
 
     boosting_method = next(
-        (e for e in boosting_method_enum if e.name.startswith(method_prefix)),
+        (e for e in boosting_method_enum if e.name.startswith(method_part)),
         None
     )
 
     if variance_normalization is None:
         raise ValueError(
-            f"No variance_normalization matches prefix '{norm_prefix}'"
+            f"No variance_normalization matches prefix '{norm_part}'"
         )
 
     if boosting_method is None:
         raise ValueError(
-            f"No boosting_method matches prefix '{method_prefix}'"
+            f"No boosting_method matches prefix '{method_part}'"
         )
 
     return {
