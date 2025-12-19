@@ -10,7 +10,8 @@ import json, re
 from enum import Enum
 
 class BoostingMethod(Enum):
-    GRADIENTS = "gradients"
+    D_GRADIENTS = "dimming_gradients"
+    B_GRADIENTS = "boosting_gradients"
     WEIGHTS = "weights"
 
 def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, variance_tracker= None, weights_only=False):
@@ -38,81 +39,86 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
     history = checkpoint['history']
     return classifier, optimizer, epoch, history, variance_tracker
 
-class GradBooster:
+class GradDimmerBooster:
     def __init__(self):
         self.weights = None
 
-    def set(self, weigths):
+    def set(self, weigths, boost, boosting_percentile_threshold, boosting_scale):
         self.weights = weigths
+        # False -> Dim useless
+        # True -> Dim useless, Boost useful 
+        self.boost = boost
+        self.boosting_percentile_threshold = boosting_percentile_threshold
+        self.boosting_scale = boosting_scale
 
     def hook(self, grad):
-        return grad * self.weights.unsqueeze(0)
+        if self.boost:
+            w = self.weights.unsqueeze(0)
+            threshold = torch.quantile(w, self.boosting_percentile_threshold)
+            boost_mask = w >= threshold
+            w[boost_mask] = w[boost_mask] * self.boosting_scale
+        else:
+            w = self.weights.unsqueeze(0)
+        return grad * w
 
 def parse_exp_filename(filename):
+
     parts = filename.split("_")
+
     escaped_encoder_name = parts[0]
     dataset_name = parts[1]
-    if parts[2] == "V":
+    mode = parts[2]
+    if mode == "V":
         return {
-            "escaped_encoder_name": escaped_encoder_name,
+            "encoder_name": escaped_encoder_name,
             "dataset_name": dataset_name,
             "boost_with_variance": False,
             "variance_tracker_window": None,
             "boosting_active_threshold": None,
             "variance_normalization": None,
             "boosting_method": None,
+            "boosting_percentile_threshold": None,
+            "boosting_scale": None,
         }
-    
-    boost_with_variance = True
-    
-    vtw_match = re.search(r"vtw\((\d+)\)", filename)
-    bathre_match = re.search(r"bathre\((\d+)\)", filename)
-    
-    if not vtw_match or not bathre_match:
-        raise ValueError(f"Cannot parse variance tracker or threshold from filename: {filename}")
-    
-    variance_tracker_window = int(vtw_match.group(1))
-    boosting_active_threshold = int(bathre_match.group(1))
-    
-    after_bathre = filename.split(f"bathre({boosting_active_threshold})_")[1]
-    name_parts = after_bathre.split("_")
-    
-    norm_prefix = name_parts[0].replace("-", "_") 
-    method_prefix = name_parts[1].replace("-", "_")
-    
-    variance_normalization = next(
-        (e for e in Normalization if e.name.startswith(norm_prefix)),
-        None
-    )
-    boosting_method = next(
-        (e for e in BoostingMethod if e.name.startswith(method_prefix)),
-        None
-    )
-    
-    if variance_normalization is None:
-        raise ValueError(f"No variance_normalization matches prefix '{norm_prefix}'")
-    if boosting_method is None:
-        raise ValueError(f"No boosting_method matches prefix '{method_prefix}'")
-    
+
+    def extract(token):
+        return token[token.index("(") + 1 : token.index(")")]
+
+    variance_tracker_window = int(extract(parts[3]))
+    boosting_active_threshold = float(extract(parts[4]))
+
+    variance_normalization = variance_normalization_enum[parts[5].replace("-", "_")]
+
+    boosting_method = boosting_method_enum[parts[6].replace("-", "_")]
+
+    boosting_percentile_threshold = float(extract(parts[7]))
+    boosting_scale = float(extract(parts[8]))
+
     return {
-        "escaped_encoder_name": escaped_encoder_name,
+        "encoder_name": escaped_encoder_name,
         "dataset_name": dataset_name,
-        "boost_with_variance": boost_with_variance,
+        "boost_with_variance": True,
         "variance_tracker_window": variance_tracker_window,
         "boosting_active_threshold": boosting_active_threshold,
         "variance_normalization": variance_normalization,
         "boosting_method": boosting_method,
+        "boosting_percentile_threshold": boosting_percentile_threshold,
+        "boosting_scale": boosting_scale,
     }
-       
+
+
 def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_tracker_window,
-                     boosting_active_threshold, variance_normalization, boosting_method):
-    escaped_encoder_name = encoder_name.split("/")[1][:6]
+                     boosting_active_threshold, variance_normalization, boosting_method,
+                     boosting_percentile_threshold, boosting_scale):
+    escaped_encoder_name = encoder_name.replace("/", "-")
     if boost_with_variance:
         variance_tracker_window_name = f"vtw({variance_tracker_window})"
         boosting_active_threshold_name = f"bathre({boosting_active_threshold})"
-        normalization_method_name = variance_normalization.name[:6].replace("_", "-")
-        boosting_method_name = boosting_method.name[:4].replace("_", "-")
-        chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_B_{variance_tracker_window_name}_{boosting_active_threshold_name}_{normalization_method_name}_{boosting_method_name}"
+        normalization_method_name = variance_normalization.name.replace("_", "-")
+        boosting_method_name = boosting_method.name.replace("_", "-")
+        boosting_percentile_threshold_name = f"bpt({boosting_percentile_threshold})"
+        boosting_scale_name = f"bs({boosting_scale})"
+        chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_B_{variance_tracker_window_name}_{boosting_active_threshold_name}_{normalization_method_name}_{boosting_method_name}_{boosting_percentile_threshold_name}_{boosting_scale_name}"
     else:
         chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_V"
     return chkpt_filename
@@ -120,6 +126,7 @@ def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_t
 def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64, n_epochs= 20,
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10,
           boosting_active_threshold=100, variance_normalization=Normalization.MIN_MAX, boosting_method = BoostingMethod.GRADIENTS,
+          boosting_percentile_threshold=85, boosting_scale=1.5,
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1, validate= False,
           verbose=True):
     
@@ -159,8 +166,8 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
     if verbose: print("Setting up online varience weighting ...")
     if boost_with_variance:
         variance_tracker = WelfordOnlineVariance(encoder_target_dim, active_threshold=boosting_active_threshold, moving_average_window=variance_tracker_window, normalization=variance_normalization, device= device)
-        if boosting_method == BoostingMethod.GRADIENTS:
-            grad_booster = GradBooster()
+        if "gradients" in boosting_method.value.lower():
+            grad_booster = GradDimmerBooster()
         else:
             None
     else:
@@ -170,7 +177,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
     # Define classifier
     if verbose: print("Defining classifier ...")
     classifier = torch.nn.Linear(encoder_target_dim, train_dataset.num_labels())
-    if boost_with_variance and boosting_method==BoostingMethod.GRADIENTS:
+    if boost_with_variance and "gradients" in boosting_method.value.lower():
         classifier.weight.register_hook(grad_booster.hook)
     classifier.to(device)
 
@@ -182,7 +189,8 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
     if verbose: print("Loading checkpoint ...")
     chkpt_filename = get_exp_filename(encoder_name, dataset_name, boost_with_variance,
                                       variance_tracker_window, boosting_active_threshold,
-                                      variance_normalization, boosting_method)
+                                      variance_normalization, boosting_method,
+                                      boosting_percentile_threshold, boosting_scale)
     chkpt_filepath = os.path.join(chkpt_path, f"{chkpt_filename}.pt")
     if os.path.exists(chkpt_filepath):
         classifier, optimizer, start_epoch, history, variance_tracker = load_checkpoint(chkpt_filepath, classifier, optimizer, variance_tracker) 
@@ -214,8 +222,12 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 var_weights = variance_tracker.variance_weights()
                 _log_vars(variance_tracker.variance(), chkpt_path, f"{chkpt_filename}_var_logs")
                 _log_vars(var_weights, chkpt_path, f"{chkpt_filename}_var_logs_weights")
-                if boosting_method == BoostingMethod.GRADIENTS:
-                    grad_booster.set(var_weights)
+                
+                if boosting_method == BoostingMethod.D_GRADIENTS:
+                    grad_booster.set(var_weights, boost=False)
+                    outputs = classifier(features)
+                elif boosting_method == BoostingMethod.B_GRADIENTS:
+                    grad_booster.set(var_weights, boost=True, boosting_percentile_threshold=boosting_percentile_threshold, boosting_scale=boosting_scale)
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.WEIGHTS:
                     with torch.no_grad():
