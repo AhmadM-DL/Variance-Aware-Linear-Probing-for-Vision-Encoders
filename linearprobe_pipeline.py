@@ -43,26 +43,11 @@ class GradDimmerBooster:
     def __init__(self):
         self.weights = None
 
-    def set_dimming(self, weigths):
-        self.weights = weigths
-        # False -> Dim useless
-        self.boost = False
- 
-    def set_boosting(self, weigths, boosting_percentile_threshold, boosting_scale):
-        self.weights = weigths
-        # True -> Dim useless, Boost useful 
-        self.boost = True
-        self.boosting_percentile_threshold = boosting_percentile_threshold
-        self.boosting_scale = boosting_scale
+    def set(self, weights):
+        self.weights = weights
 
     def hook(self, grad):
-        if self.boost:
-            w = self.weights.unsqueeze(0)
-            threshold = torch.quantile(w, self.boosting_percentile_threshold)
-            boost_mask = w >= threshold
-            w[boost_mask] = w[boost_mask] * self.boosting_scale
-        else:
-            w = self.weights.unsqueeze(0)
+        w = self.weights.unsqueeze(0)
         return grad * w
 
 def parse_exp_filename(filename):
@@ -225,13 +210,14 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 variance_tracker.update(features)
                 var_weights = variance_tracker.variance_weights()
                 _log_vars(variance_tracker.variance(), chkpt_path, f"{chkpt_filename}_var_logs")
-                _log_vars(var_weights, chkpt_path, f"{chkpt_filename}_var_logs_weights")
-                
                 if boosting_method == BoostingMethod.D_GRADIENTS:
-                    grad_booster.set_dimming(var_weights)
+                    grad_booster.set(var_weights)
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.B_GRADIENTS:
-                    grad_booster.set_boosting(var_weights, boosting_percentile_threshold=boosting_percentile_threshold, boosting_scale=boosting_scale)
+                    threshold = torch.quantile(var_weights, boosting_percentile_threshold)
+                    boost_mask = var_weights >= threshold
+                    var_weights[boost_mask] = var_weights[boost_mask] * boosting_scale
+                    grad_booster.set(var_weights)
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.WEIGHTS:
                     with torch.no_grad():
@@ -239,6 +225,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     outputs = classifier(features)
                 else:
                     raise Exception("Not supported boosting method.")
+                _log_vars(var_weights, chkpt_path, f"{chkpt_filename}_var_logs_weights")
             else:
                 outputs = classifier(features)
             loss = criterion(outputs, labels)
