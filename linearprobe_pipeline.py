@@ -87,9 +87,9 @@ def parse_exp_filename(filename):
     variance_tracker_window = int(extract(parts[3]))
     boosting_active_threshold = float(extract(parts[4]))
 
-    variance_normalization = variance_normalization_enum[parts[5].replace("-", "_")]
+    variance_normalization = Normalization[parts[5].replace("-", "_")]
 
-    boosting_method = boosting_method_enum[parts[6].replace("-", "_")]
+    boosting_method = BoostingMethod[parts[6].replace("-", "_")]
 
     boosting_percentile_threshold = float(extract(parts[7]))
     boosting_scale = float(extract(parts[8]))
