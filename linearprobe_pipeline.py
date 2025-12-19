@@ -277,11 +277,13 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 with torch.no_grad():
                     features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
                 
-                # if boost_gradients_with_variance:
-                #     var_weights = variance_tracker.variance_weights().view(1, -1)
-                #     weighted_weights = classifier.weight * var_weights * weight_multiplier
-                #     outputs = F.linear(features, weighted_weights, classifier.bias)
-                # else:
+                if boost_with_variance and boosting_method == BoostingMethod.WEIGHTS:
+                    var_weights = variance_tracker.variance_weights().view(1, -1)
+                    weights = var_weights.view(1, -1)
+                    weighted_weights = classifier.weight * weights * boosting_scale
+                    outputs = F.linear(features, weighted_weights, classifier.bias)
+                    outputs = classifier(features)
+                else:
                     outputs = classifier(features)
 
                 loss = criterion(outputs, labels)
@@ -319,11 +321,13 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 with torch.no_grad():
                     features = get_features(encoder, inputs, encoder_target_dim, device="cuda")
                 
-                # if boost_gradients_with_variance:
-                #     var_weights = variance_tracker.variance_weights().view(1, -1)
-                #     weighted_weights = classifier.weight * var_weights * weight_multiplier
-                #     outputs = F.linear(features, weighted_weights, classifier.bias)
-                # else:
+                if boost_with_variance and boosting_method == BoostingMethod.WEIGHTS:
+                    var_weights = variance_tracker.variance_weights().view(1, -1)
+                    weights = var_weights.view(1, -1)
+                    weighted_weights = classifier.weight * weights * boosting_scale
+                    outputs = F.linear(features, weighted_weights, classifier.bias)
+                    outputs = classifier(features)
+                else:
                     outputs = classifier(features)
 
                 loss = criterion(outputs, labels)
