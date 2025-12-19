@@ -59,11 +59,16 @@ class WelfordOnlineVariance:
 
 def _normalize(x, norm: Normalization, eps: float = 1e-8):
     if norm == Normalization.MIN_MAX:
-        return (x - x.min()) / (x.max() - x.min() + eps)
+        norm_x = (x - x.min()) / (x.max() - x.min() + eps)
+        return norm_x
 
     if norm == Normalization.LOG_MIN_MAX:
+        x = torch.clamp(x, min=eps)
         x = torch.log(x)
-        return (x - x.min()) / (x.max() - x.min() + eps)
+        norm_x = (x - x.min()) / (x.max() - x.min() + eps)
+        if torch.isnan(norm_x).any() or torch.isinf(norm_x).any():
+            raise ValueError("Input contains NaN or Inf values after log transformation.")
+        return norm_x
 
     raise ValueError(f"Unknown normalization: {norm}")
 
