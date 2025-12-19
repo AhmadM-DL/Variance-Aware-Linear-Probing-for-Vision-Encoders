@@ -43,11 +43,15 @@ class GradDimmerBooster:
     def __init__(self):
         self.weights = None
 
-    def set(self, weigths, boost, boosting_percentile_threshold, boosting_scale):
+    def set_dimming(self, weigths):
         self.weights = weigths
         # False -> Dim useless
+        self.boost = False
+ 
+    def set_boosting(self, weigths, boosting_percentile_threshold, boosting_scale):
+        self.weights = weigths
         # True -> Dim useless, Boost useful 
-        self.boost = boost
+        self.boost = True
         self.boosting_percentile_threshold = boosting_percentile_threshold
         self.boosting_scale = boosting_scale
 
@@ -224,10 +228,10 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 _log_vars(var_weights, chkpt_path, f"{chkpt_filename}_var_logs_weights")
                 
                 if boosting_method == BoostingMethod.D_GRADIENTS:
-                    grad_booster.set(var_weights, boost=False)
+                    grad_booster.set_dimming(var_weights)
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.B_GRADIENTS:
-                    grad_booster.set(var_weights, boost=True, boosting_percentile_threshold=boosting_percentile_threshold, boosting_scale=boosting_scale)
+                    grad_booster.set_boosting(var_weights, boosting_percentile_threshold=boosting_percentile_threshold, boosting_scale=boosting_scale)
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.WEIGHTS:
                     with torch.no_grad():
