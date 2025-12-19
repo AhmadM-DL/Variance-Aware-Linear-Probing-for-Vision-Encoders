@@ -12,6 +12,7 @@ from enum import Enum
 class BoostingMethod(Enum):
     D_GRADIENTS = "dimming_gradients"
     B_GRADIENTS = "boosting_gradients"
+    DROP_OUT = "drop_out"
     WEIGHTS = "weights"
 
 def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, variance_tracker= None, weights_only=False):
