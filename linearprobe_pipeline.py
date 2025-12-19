@@ -115,7 +115,7 @@ def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_t
 def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64, n_epochs= 20,
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10,
           boosting_active_threshold=100, variance_normalization=Normalization.MIN_MAX, boosting_method = BoostingMethod.D_GRADIENTS,
-          boosting_percentile_threshold=85, boosting_scale=1.5,
+          boosting_percentile_threshold=85, boosting_scale=1.5, optimizer_type= "adam",
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1, validate= False,
           verbose=True):
     
@@ -172,7 +172,12 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
 
     # Define optimizer
     if verbose: print("Defining optimizer ...")
-    optimizer = torch.optim.Adam(classifier.parameters(), lr=learning_rate)
+    if optimizer_type.lower() == "sgd":
+        optimizer = torch.optim.SGD(classifier.parameters(), lr=learning_rate)
+    elif optimizer_type.lower() == "adam":
+        optimizer = torch.optim.Adam(classifier.parameters(), lr=learning_rate)
+    else:
+        raise ValueError(f"Unknown optimizer type: {optimizer_type}")
 
     # Load checkpoint
     if verbose: print("Loading checkpoint ...")
