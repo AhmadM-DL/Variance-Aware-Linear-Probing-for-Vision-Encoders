@@ -125,7 +125,7 @@ def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_t
 
 def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64, n_epochs= 20,
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10,
-          boosting_active_threshold=100, variance_normalization=Normalization.MIN_MAX, boosting_method = BoostingMethod.GRADIENTS,
+          boosting_active_threshold=100, variance_normalization=Normalization.MIN_MAX, boosting_method = BoostingMethod.D_GRADIENTS,
           boosting_percentile_threshold=85, boosting_scale=1.5,
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1, validate= False,
           verbose=True):
