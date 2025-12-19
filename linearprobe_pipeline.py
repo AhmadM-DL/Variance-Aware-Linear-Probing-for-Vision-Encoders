@@ -39,15 +39,29 @@ def load_checkpoint(path, classifier, optimizer, variance_tracker= None):
     history = checkpoint['history']
     return classifier, optimizer, epoch, history, variance_tracker
 
-class GradDimmerBooster:
+class GradHooker:
     def __init__(self):
         self.weights = None
+        self.hooking_method = None
 
-    def set(self, weights):
+    def set_dimming(self, weights):
         self.weights = weights
+        self.hooking_method = "dimming"
+
+    def set_boosting(self, weights, percentile_threshold, scale):
+        self.weights = weights
+        self.percentile_threshold = percentile_threshold
+        self.scale = scale
+        self.hooking_method = "boosting"
 
     def hook(self, grad):
         w = self.weights.unsqueeze(0)
+        if self.hooking_method == "dimming":
+            pass
+        elif self.hooking_method == "boosting":
+            threshold = torch.quantile(self.weights, self.percentile_threshold)
+            boost_mask = self.weights >= threshold
+            w[:, boost_mask] = w[:, boost_mask] * self.scale
         return grad * w
 
 def parse_exp_filename(filename):
@@ -156,7 +170,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
     if boost_with_variance:
         variance_tracker = WelfordOnlineVariance(encoder_target_dim, active_threshold=boosting_active_threshold, moving_average_window=variance_tracker_window, normalization=variance_normalization, device= device)
         if "gradients" in boosting_method.value.lower():
-            grad_booster = GradDimmerBooster()
+            grad_booster = GradHooker()
         else:
             None
     else:
@@ -216,18 +230,21 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 var_weights = variance_tracker.variance_weights()
                 _log_vars(variance_tracker.variance(), chkpt_path, f"{chkpt_filename}_var_logs")
                 if boosting_method == BoostingMethod.D_GRADIENTS:
-                    grad_booster.set(var_weights)
+                    grad_booster.set_dimming(var_weights)
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.B_GRADIENTS:
-                    threshold = torch.quantile(var_weights, boosting_percentile_threshold)
-                    boost_mask = var_weights >= threshold
-                    var_weights[boost_mask] = var_weights[boost_mask] * boosting_scale
-                    grad_booster.set(var_weights)
+                    grad_booster.set_boosting(var_weights, boosting_percentile_threshold, boosting_scale)
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.WEIGHTS:
                     with torch.no_grad():
                         classifier.weight.mul_(var_weights.view(1,-1))
                     outputs = classifier(features)
+                elif boosting_method == BoostingMethod.DROP_OUT:
+                    threshold = torch.quantile(var_weights, boosting_percentile_threshold)
+                    drop_mask = var_weights < threshold
+                    features[:, drop_mask] = 0
+                    outputs = classifier(features)
+                    pass
                 else:
                     raise Exception("Not supported boosting method.")
                 _log_vars(var_weights, chkpt_path, f"{chkpt_filename}_var_logs_weights")
