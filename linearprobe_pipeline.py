@@ -222,10 +222,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     threshold = torch.quantile(var_weights, boosting_percentile_threshold)
                     boost_mask = var_weights >= threshold
                     var_weights[boost_mask] = var_weights[boost_mask] * boosting_scale
-                    var_weights[~boost_mask] = 0
-
                     var_weights[~boost_mask] = torch.where(var_weights[~boost_mask] > 0, -var_weights[~boost_mask], var_weights[~boost_mask])
-
                     grad_booster.set(var_weights)
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.WEIGHTS:
