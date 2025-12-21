@@ -252,7 +252,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     penalty_mask = var_weights < threshold
                     print({"Penalty ratio": f"{penalty_mask.sum().item()}/{penalty_mask.shape[0]}"})
                     low_var_weights = classifier.weight[:, penalty_mask]
-                    penalty = low_var_weights.pow(2* boosting_scale).sum() 
+                    penalty = low_var_weights.pow(2).sum() 
                     print({"Penalty": penalty.item()})
                     outputs = classifier(features)
                 else:
