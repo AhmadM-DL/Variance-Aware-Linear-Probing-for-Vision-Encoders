@@ -250,8 +250,10 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 elif boosting_method == BoostingMethod.WEIGHTS_PENALTY:
                     threshold = torch.quantile(var_weights, boosting_percentile_threshold)
                     penalty_mask = var_weights < threshold
+                    if verbose: print(f"Penalty mask ratio: {penalty_mask.sum().item()}/{penalty_mask.shape[0]}")
                     low_var_weights = classifier.weight[:, penalty_mask]
                     penalty = low_var_weights.pow(2* boosting_scale).sum() 
+                    print(f"Penalty: {penalty.item()}")
                     outputs = classifier(features)
                 else:
                     raise Exception("Not supported boosting method.")
