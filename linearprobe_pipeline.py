@@ -251,7 +251,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     threshold = torch.quantile(var_weights, boosting_percentile_threshold)
                     penalty_mask = var_weights < threshold
                     low_var_weights = classifier.weight[:, penalty_mask]
-                    penalty = low_var_weights.pow(2).mean() * boosting_scale
+                    penalty = low_var_weights.pow(2).sum() * boosting_scale
                     outputs = classifier(features)
                 else:
                     raise Exception("Not supported boosting method.")
