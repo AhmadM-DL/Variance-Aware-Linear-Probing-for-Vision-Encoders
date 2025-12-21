@@ -14,6 +14,7 @@ class BoostingMethod(Enum):
     B_GRADIENTS = "boosting_gradients"
     DROP_OUT = "drop_out"
     WEIGHTS = "weights"
+    WEIGHTS_PENALTY = "weights_penalty"
 
 def save_checkpoint(path, classifier, optimizer, epoch, history, hyperparams, variance_tracker= None, weights_only=False):
     checkpoint = {
@@ -246,13 +247,21 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     drop_mask = var_weights < threshold
                     features[:, drop_mask] = 0
                     outputs = classifier(features)
-                    pass
+                elif boosting_method == BoostingMethod.WEIGHTS_PENALTY:
+                    threshold = torch.quantile(var_weights, boosting_percentile_threshold)
+                    penalty_mask = var_weights < threshold
+                    low_var_weights = classifier.weight[:, penalty_mask]
+                    penalty = low_var_weights.pow(2).mean() * boosting_scale
+                    outputs = classifier(features)
                 else:
                     raise Exception("Not supported boosting method.")
                 _log_vars(var_weights, chkpt_path, f"{chkpt_filename}_var_logs_weights")
             else:
                 outputs = classifier(features)
-            loss = criterion(outputs, labels)
+            if boost_with_variance and boosting_method == BoostingMethod.WEIGHTS_PENALTY:
+                loss = criterion(outputs, labels) + penalty
+            else:
+                loss = criterion(outputs, labels)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
