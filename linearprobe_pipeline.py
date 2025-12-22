@@ -248,7 +248,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     features[:, drop_mask] = 0
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.WEIGHTS_PENALTY:
-                    threshold = torch.quantile(var_weights, boosting_percentile_threshold
+                    threshold = torch.quantile(var_weights, boosting_percentile_threshold)
                     low_var_weights = classifier.weight[:, var_weights < 0.3]
                     high_var_weights = classifier.weight[:, var_weights > 0.8]
                     penalty = low_var_weights.pow(2).sum() / (high_var_weights.pow(2).sum() + 1e-8)
