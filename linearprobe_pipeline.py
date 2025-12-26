@@ -119,7 +119,7 @@ def parse_exp_filename(filename):
 def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_tracker_window,
                      boosting_active_threshold, variance_normalization, boosting_method,
                      boosting_percentile_threshold, boosting_scale):
-    escaped_encoder_name = encoder_name.replace("/", "-")
+    escaped_encoder_name = encoder_name.replace("/", "-").replace("_", "-")
     if boost_with_variance:
         variance_tracker_window_name = f"vtw({variance_tracker_window})"
         boosting_active_threshold_name = f"bathre({boosting_active_threshold})"
