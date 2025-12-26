@@ -96,7 +96,7 @@ def parse_exp_filename(filename):
 
     boosting_method = BoostingMethod[parts[6].replace("-", "_")]
 
-    boosting_percentile_threshold = float(extract(parts[7])) if extract(parts[7]) else None
+    boosting_percentile_threshold = eval(extract(parts[7])) if extract(parts[7]) else None
     boosting_scale = float(extract(parts[8])) if extract(parts[8]) else None
 
     return {
