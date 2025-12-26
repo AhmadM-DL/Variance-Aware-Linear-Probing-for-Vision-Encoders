@@ -99,7 +99,8 @@ def parse_exp_filename(filename):
     try:
         boosting_percentile_threshold = float(extract(part[7]))
     except: # is tuple
-        boosting_percentile_threshold = eval(parts[7]+")")
+        bpt = extract(part[7]).replace("bpt", "")+")"
+        boosting_percentile_threshold = eval(bpt)
     boosting_scale = float(extract(parts[8])) if extract(parts[8]) else None
 
     return {
