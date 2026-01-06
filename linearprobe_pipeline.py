@@ -295,7 +295,6 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     weights = var_weights.view(1, -1)
                     weighted_weights = classifier.weight * weights * boosting_scale
                     outputs = F.linear(features, weighted_weights, classifier.bias)
-                    outputs = classifier(features)
                 else:
                     outputs = classifier(features)
 
@@ -339,7 +338,6 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     weights = var_weights.view(1, -1)
                     weighted_weights = classifier.weight * weights * boosting_scale
                     outputs = F.linear(features, weighted_weights, classifier.bias)
-                    outputs = classifier(features)
                 else:
                     outputs = classifier(features)
 
