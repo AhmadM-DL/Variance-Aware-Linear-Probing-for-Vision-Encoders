@@ -245,7 +245,6 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     weights = var_weights.view(1, -1)
                     weighted_weights = classifier.weight * weights * boosting_scale
                     outputs = F.linear(features, weighted_weights, classifier.bias)
-                    outputs = classifier(features)
                 elif boosting_method == BoostingMethod.DROP_OUT:
                     threshold = torch.quantile(var_weights, boosting_percentile_threshold)
                     drop_mask = var_weights < threshold
