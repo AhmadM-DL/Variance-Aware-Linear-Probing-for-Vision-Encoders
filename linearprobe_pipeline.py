@@ -101,7 +101,13 @@ def parse_exp_filename(filename):
     except: # is tuple
         bpt = extract(parts[7]).replace("bpt", "")+")"
         boosting_percentile_threshold = eval(bpt)
-    boosting_scale = float(extract(parts[8])) if extract(parts[8]) else None
+
+    if "auto" in parts[8]:
+        boosting_scale = "auto"
+    elif extract(parts[8]):
+        boosting_scale = float(extract(parts[8]))
+    else:
+        boosting_scale = None
 
     return {
         "encoder_name": escaped_encoder_name,
@@ -135,7 +141,7 @@ def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_t
 def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64, n_epochs= 20,
           encoder_target_dim=768, num_workers=4, learning_rate=1e-3, variance_tracker_window=10,
           boosting_active_threshold=100, variance_normalization=Normalization.MIN_MAX, boosting_method = BoostingMethod.D_GRADIENTS,
-          boosting_percentile_threshold=85, boosting_scale=1.5, optimizer_type= "adam",
+          boosting_percentile_threshold=85, boosting_scale="auto", optimizer_type= "adam",
           random_state=42, chkpt_path="./chkpt", test_every_x_steps=1, validate= False,
           verbose=True):
     
@@ -243,6 +249,8 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.WEIGHTS:
                     weights = var_weights.view(1, -1)
+                    if boosting_scale == "auto":
+                        boosting_scale = variance_tracker.get_boosting_scale()
                     weighted_weights = classifier.weight * weights * boosting_scale
                     outputs = F.linear(features, weighted_weights, classifier.bias)
                 elif boosting_method == BoostingMethod.DROP_OUT:
@@ -255,6 +263,8 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     high_threshold = torch.quantile(var_weights, boosting_percentile_threshold[1])
                     low_var_weights = classifier.weight[:, var_weights < low_threshold]
                     high_var_weights = classifier.weight[:, var_weights > high_threshold]
+                    if boosting_scale == "auto":
+                        boosting_scale = variance_tracker.get_boosting_scale()
                     penalty = boosting_scale * (low_var_weights.pow(2).sum() / (high_var_weights.pow(2).sum() + 1e-8))
                     outputs = classifier(features)
                 else:

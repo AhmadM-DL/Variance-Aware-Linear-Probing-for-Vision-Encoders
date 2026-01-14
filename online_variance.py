@@ -56,6 +56,13 @@ class WelfordOnlineVariance:
         else:
             var = self.moving_average_variance()
             return _normalize(var, norm=self.normalization)
+    
+    def get_boosting_scale(self):
+        mean_variance = self.moving_average_variance().mean()
+        mean_variance = torch.clamp(mean_variance, min=1e-8)
+        log_mean_variance = torch.log(mean_variance)
+        boosting_scale = 0.1 * torch.exp(-1.1*log_mean_variance) + 2.4
+        return boosting_scale
 
 def _normalize(x, norm: Normalization, eps: float = 1e-8):
     if norm == Normalization.MIN_MAX:
