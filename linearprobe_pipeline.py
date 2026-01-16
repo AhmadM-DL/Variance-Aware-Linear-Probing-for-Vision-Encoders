@@ -70,6 +70,8 @@ def parse_exp_filename(filename):
 
     parts = filename.split("_")
 
+    extract= lambda token: token[token.index("(") + 1 : token.index(")")]
+
     escaped_encoder_name = parts[0]
     dataset_name = parts[1]
     mode = parts[2]
@@ -84,10 +86,8 @@ def parse_exp_filename(filename):
             "boosting_method": None,
             "boosting_percentile_threshold": None,
             "boosting_scale": None,
+            "random_state": int(extract(parts[3])),
         }
-
-    def extract(token):
-        return token[token.index("(") + 1 : token.index(")")]
 
     variance_tracker_window = int(extract(parts[3]))
     boosting_active_threshold = float(extract(parts[4]))
