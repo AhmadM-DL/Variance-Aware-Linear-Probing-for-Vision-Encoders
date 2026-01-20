@@ -65,6 +65,14 @@ class GradHooker:
             boost_mask = self.weights >= threshold
             w[:, boost_mask] = w[:, boost_mask] * self.scale
         return grad * w
+    
+def boosting_scale_from_variance(var):
+    mean_variance = var.mean()
+    mean_variance = torch.clamp(mean_variance, min=1e-8)
+    log_mean_variance = torch.log(mean_variance)
+    boosting_scale = 0.1 * torch.exp(-1.1*log_mean_variance) + 1
+    boosting_scale = torch.floor(boosting_scale.item())
+    return boosting_scale
 
 def parse_exp_filename(filename):
 
@@ -253,7 +261,8 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 elif boosting_method == BoostingMethod.WEIGHTS:
                     weights = var_weights.view(1, -1)
                     if boosting_scale == "auto":
-                        boosting_scale = variance_tracker.get_boosting_scale()
+                        ma_var = variance_tracker.moving_average_variance()
+                        boosting_scale = boosting_scale_from_variance(ma_var)
                     weighted_weights = classifier.weight * weights * boosting_scale
                     outputs = F.linear(features, weighted_weights, classifier.bias)
                 elif boosting_method == BoostingMethod.DROP_OUT:
@@ -267,7 +276,8 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     low_var_weights = classifier.weight[:, var_weights < low_threshold]
                     high_var_weights = classifier.weight[:, var_weights > high_threshold]
                     if boosting_scale == "auto":
-                        boosting_scale = variance_tracker.get_boosting_scale()
+                        ma_var = variance_tracker.moving_average_variance()
+                        boosting_scale = boosting_scale_from_variance(ma_var)
                     penalty = boosting_scale * (low_var_weights.pow(2).sum() / (high_var_weights.pow(2).sum() + 1e-8))
                     outputs = classifier(features)
                 else:
