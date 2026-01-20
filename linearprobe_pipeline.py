@@ -71,7 +71,7 @@ def boosting_scale_from_variance(var):
     mean_variance = torch.clamp(mean_variance, min=1e-8)
     log_mean_variance = torch.log(mean_variance)
     boosting_scale = 0.1 * torch.exp(-1.1*log_mean_variance) + 1
-    boosting_scale = torch.floor(boosting_scale.item())
+    boosting_scale = torch.floor(boosting_scale)
     return boosting_scale
 
 def parse_exp_filename(filename):
