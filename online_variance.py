@@ -5,12 +5,14 @@ from enum import Enum
 class Normalization(Enum):
     MIN_MAX = "min_max"
     LOG_MIN_MAX = "log_min_max"
+    SCALED_LOG_MIN_MAX = "scaled_log_min_max"
 
 class WelfordOnlineVariance:
     def __init__(self, num_features,
                 active_threshold=200,
                 moving_average_window= 10,
                 normalization=Normalization.MIN_MAX,
+                log_scale=100,
                 device='cuda'):
         
         self.n = 0
@@ -20,6 +22,7 @@ class WelfordOnlineVariance:
         self.moving_average_window = moving_average_window
         self.queue = deque(maxlen=moving_average_window)
         self.normalization = normalization
+        self.log_scale = log_scale
 
     @torch.no_grad()
     def update(self, x):
@@ -55,9 +58,9 @@ class WelfordOnlineVariance:
             return torch.ones_like(self.mean)
         else:
             var = self.moving_average_variance()
-            return _normalize(var, norm=self.normalization)
+            return _normalize(var, norm=self.normalization, log_scale=self.log_scale)
 
-def _normalize(x, norm: Normalization, eps: float = 1e-8):
+def _normalize(x, norm: Normalization, log_scale: float, eps: float = 1e-8):
     if norm == Normalization.MIN_MAX:
         norm_x = (x - x.min()) / (x.max() - x.min() + eps)
         return norm_x
@@ -68,6 +71,14 @@ def _normalize(x, norm: Normalization, eps: float = 1e-8):
         norm_x = (x - x.min()) / (x.max() - x.min() + eps)
         if torch.isnan(norm_x).any() or torch.isinf(norm_x).any():
             raise ValueError("Input contains NaN or Inf values after log transformation.")
+        return norm_x
+
+    if norm == Normalization.SCALED_LOG_MIN_MAX:
+        x = torch.clamp(x, min=eps)
+        x = torch.log1p(log_scale * x) # log(1 + alpha.x)
+        norm_x = (x - x.min()) / (x.max() - x.min() + eps)
+        if torch.isnan(norm_x).any() or torch.isinf(norm_x).any():
+            raise ValueError("Input contains NaN or Inf values after scaled log transformation.")
         return norm_x
 
     raise ValueError(f"Unknown normalization: {norm}")
