@@ -12,7 +12,7 @@ class WelfordOnlineVariance:
                 active_threshold=200,
                 moving_average_window= 10,
                 normalization=Normalization.MIN_MAX,
-                log_scale=100,
+                log_scale=500,
                 device='cuda'):
         
         self.n = 0
