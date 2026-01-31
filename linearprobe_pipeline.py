@@ -260,11 +260,16 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                     outputs = classifier(features)
                 elif boosting_method == BoostingMethod.WEIGHTS:
                     weights = var_weights.view(1, -1)
-                    if boosting_scale == "auto":
+                    if torch.all(weights == 1): # Boosting Not Active
+                        outputs = classifier(features)
+                    elif boosting_scale == "auto":
                         ma_var = variance_tracker.moving_average_variance()
-                        boosting_scale = boosting_scale_from_variance(ma_var)
-                    weighted_weights = classifier.weight * weights * boosting_scale
-                    outputs = F.linear(features, weighted_weights, classifier.bias)
+                        auto_boosting_scale = boosting_scale_from_variance(ma_var)
+                        weighted_weights = classifier.weight * weights * auto_boosting_scale
+                        outputs = F.linear(features, weighted_weights, classifier.bias)
+                    else:   
+                        weighted_weights = classifier.weight * weights * boosting_scale
+                        outputs = F.linear(features, weighted_weights, classifier.bias)
                 elif boosting_method == BoostingMethod.DROP_OUT:
                     threshold = torch.quantile(var_weights, boosting_percentile_threshold)
                     drop_mask = var_weights < threshold
@@ -316,8 +321,16 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 if boost_with_variance and boosting_method == BoostingMethod.WEIGHTS:
                     var_weights = variance_tracker.variance_weights().view(1, -1)
                     weights = var_weights.view(1, -1)
-                    weighted_weights = classifier.weight * weights * boosting_scale
-                    outputs = F.linear(features, weighted_weights, classifier.bias)
+                    if torch.all(weights == 1): # Boosting Not Active
+                        outputs = classifier(features)
+                    elif boosting_scale == "auto":
+                        ma_var = variance_tracker.moving_average_variance()
+                        auto_boosting_scale = boosting_scale_from_variance(ma_var)
+                        weighted_weights = classifier.weight * weights * auto_boosting_scale
+                        outputs = F.linear(features, weighted_weights, classifier.bias)
+                    else:   
+                        weighted_weights = classifier.weight * weights * boosting_scale
+                        outputs = F.linear(features, weighted_weights, classifier.bias)
                 else:
                     outputs = classifier(features)
 
@@ -359,8 +372,16 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
                 if boost_with_variance and boosting_method == BoostingMethod.WEIGHTS:
                     var_weights = variance_tracker.variance_weights().view(1, -1)
                     weights = var_weights.view(1, -1)
-                    weighted_weights = classifier.weight * weights * boosting_scale
-                    outputs = F.linear(features, weighted_weights, classifier.bias)
+                    if torch.all(weights == 1): # Boosting Not Active
+                        outputs = classifier(features)
+                    elif boosting_scale == "auto":
+                        ma_var = variance_tracker.moving_average_variance()
+                        auto_boosting_scale = boosting_scale_from_variance(ma_var)
+                        weighted_weights = classifier.weight * weights * auto_boosting_scale
+                        outputs = F.linear(features, weighted_weights, classifier.bias)
+                    else:   
+                        weighted_weights = classifier.weight * weights * boosting_scale
+                        outputs = F.linear(features, weighted_weights, classifier.bias)
                 else:
                     outputs = classifier(features)
 
