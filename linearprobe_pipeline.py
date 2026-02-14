@@ -95,6 +95,8 @@ def parse_exp_filename(filename):
             "boosting_percentile_threshold": None,
             "boosting_scale": None,
             "random_state": int(extract(parts[3])),
+            "batch_size": int(extract(parts[4])),
+            "learning_rate": float(extract(parts[5])),
         }
 
     variance_tracker_window = int(extract(parts[3]))
@@ -118,6 +120,8 @@ def parse_exp_filename(filename):
         boosting_scale = None
 
     random_state = int(extract(parts[9]))
+    batch_size = int(extract(parts[10]))
+    learning_rate = float(extract(parts[11]))
 
     return {
         "encoder_name": escaped_encoder_name,
@@ -130,12 +134,14 @@ def parse_exp_filename(filename):
         "boosting_percentile_threshold": boosting_percentile_threshold,
         "boosting_scale": boosting_scale,
         "random_state": random_state,
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
     }
 
 
 def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_tracker_window,
                      boosting_active_threshold, variance_normalization, boosting_method,
-                     boosting_percentile_threshold, boosting_scale, random_state):
+                     boosting_percentile_threshold, boosting_scale, random_state, batch_size, learning_rate):
     escaped_encoder_name = encoder_name.replace("/", "-").replace("_", "-")
     if boost_with_variance:
         variance_tracker_window_name = f"vtw({variance_tracker_window})"
@@ -144,9 +150,9 @@ def get_exp_filename(encoder_name, dataset_name, boost_with_variance, variance_t
         boosting_method_name = boosting_method.name.replace("_", "-")
         boosting_percentile_threshold_name = f"bpt({boosting_percentile_threshold})"
         boosting_scale_name = f"bs({boosting_scale})"
-        chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_B_{variance_tracker_window_name}_{boosting_active_threshold_name}_{normalization_method_name}_{boosting_method_name}_{boosting_percentile_threshold_name}_{boosting_scale_name}_rs({random_state})"
+        chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_B_{variance_tracker_window_name}_{boosting_active_threshold_name}_{normalization_method_name}_{boosting_method_name}_{boosting_percentile_threshold_name}_{boosting_scale_name}_rs({random_state})_bs({batch_size})_lr({learning_rate})"
     else:
-        chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_V_rs({random_state})"
+        chkpt_filename = f"{escaped_encoder_name}_{dataset_name}_V_rs({random_state})_bs({batch_size})_lr({learning_rate})"
     return chkpt_filename
 
 def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64, n_epochs= 20,
@@ -221,7 +227,7 @@ def probe(encoder_name, dataset_name, boost_with_variance= False, batch_size= 64
     chkpt_filename = get_exp_filename(encoder_name, dataset_name, boost_with_variance,
                                       variance_tracker_window, boosting_active_threshold,
                                       variance_normalization, boosting_method,
-                                      boosting_percentile_threshold, boosting_scale, random_state)
+                                      boosting_percentile_threshold, boosting_scale, random_state, batch_size, learning_rate)
     chkpt_filepath = os.path.join(chkpt_path, f"{chkpt_filename}.pt")
     if os.path.exists(chkpt_filepath):
         classifier, optimizer, start_epoch, history, variance_tracker = load_checkpoint(chkpt_filepath, classifier, optimizer, variance_tracker) 
